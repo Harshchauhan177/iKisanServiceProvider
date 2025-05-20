@@ -166,8 +166,8 @@ class DataController: ObservableObject {
             throw AuthError.invalidCredentials
         }
         
-        // Create auth user
-        let authResponse = try await supabase.auth.signUp(email: email, password: password)
+        // Sign in instead of signing up again
+        let authResponse = try await supabase.auth.signIn(email: email, password: password)
         
         // Insert producer record into "producer" table
         let producer = Producer(
