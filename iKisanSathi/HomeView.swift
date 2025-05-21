@@ -97,79 +97,70 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 20) {
-                    // Header
+                VStack(spacing: 24) {
+                    // Subtitle below large title
                     HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Hello ")
-                                .font(.title2)
-                                .fontWeight(.bold)
-                            Text("how are you today?")
+                        Text("how are you today?")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                    }
+                    .padding(.horizontal)
+                    .padding(.top, 2)
+
+                    // Add Equipment Card
+                    HStack {
+                        ZStack {
+                            Circle()
+                                .fill(Color.blue.opacity(0.15))
+                                .frame(width: 56, height: 56)
+                            Image(systemName: "wrench.and.screwdriver.fill")
+                                .font(.system(size: 28))
+                                .foregroundColor(.blue)
+                        }
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Add Equipment")
+                                .font(.title3)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.primary)
+                            Text("List your equipment for service")
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                         }
                         Spacer()
-                        HStack(spacing: 16) {
-                            Button(action: { /* Search action */ }) {
-                                Image(systemName: "magnifyingglass")
-                                    .foregroundColor(.primary)
-                            }
-                            NavigationLink(destination: ProfileView()) {
-                                Image(systemName: "bell.fill")
-                                    .foregroundColor(.primary)
-                            }
-                        }
                     }
+                    .padding()
+                    .background(Color.white)
+                    .cornerRadius(20)
+                    .shadow(color: Color.black.opacity(0.03), radius: 4, x: 0, y: 2)
                     .padding(.horizontal)
-                    
-                    // Feature Cards
-                    VStack(spacing: 16) {
-                        FeatureCard(
-                            title: "Add Equipment",
-                            subtitle: "List your equipment for service",
-                            color: .blue,
-                            isLarge: true
-                        ) {
-                            selectedTab = 2
-                        }
-                        
-                        FeatureCard(
-                            title: "View Requests",
-                            subtitle: "Check rental requests",
-                            color: .purple,
-                            isLarge: true
-                        ) {
-                            isRequestsActive = true
-                        }
+                    .onTapGesture {
+                        selectedTab = 2
                     }
-                    .padding(.horizontal)
-                    
-                    // Categories
-                    VStack(alignment: .leading, spacing: 16) {
+
+                    // Quick Access Grid
+                    VStack(alignment: .leading, spacing: 12) {
                         Text("Quick Access")
                             .font(.title3)
                             .fontWeight(.bold)
                             .padding(.horizontal)
-                        
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 24) {
-                                CategoryButton(title: "Equipment", iconName: "wrench.and.screwdriver.fill") {
-                                    selectedTab = 2
-                                }
-                                CategoryButton(title: "Requests", iconName: "bell.fill") {
-                                    isRequestsActive = true
-                                }
-                                CategoryButton(title: "Services", iconName: "clock.fill") {
-                                    isServiceRequestsActive = true
-                                }
-                                CategoryButton(title: "Income", iconName: "indianrupeesign.circle.fill") {
-                                    isIncomeAnalysisActive = true
-                                }
+                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 20) {
+                            QuickAccessButton(title: "Equipment", iconName: "wrench.and.screwdriver.fill", color: .blue) {
+                                selectedTab = 2
                             }
-                            .padding(.horizontal)
+                            QuickAccessButton(title: "Request", iconName: "doc.fill", color: .green) {
+                                isRequestsActive = true
+                            }
+                            QuickAccessButton(title: "Service", iconName: "wrench.adjustable.fill", color: .purple) {
+                                isServiceRequestsActive = true
+                            }
+                            QuickAccessButton(title: "Income", iconName: "chart.line.uptrend.xyaxis", color: .orange) {
+                                isIncomeAnalysisActive = true
+                            }
                         }
+                        .padding(.horizontal)
                     }
-                    
+
                     // Top Equipment
                     VStack(alignment: .leading, spacing: 16) {
                         HStack {
@@ -183,10 +174,10 @@ struct HomeView: View {
                             .foregroundColor(.blue)
                         }
                         .padding(.horizontal)
-                        
+                        // Keep the equipment cards horizontally scrollable as before
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 16) {
-                                ForEach(Array(dataController.equipmentDetails.values.prefix(5)), id: \.equipmentID) { equipment in
+                                ForEach(Array(dataController.equipmentDetails.values.prefix(5)), id: \ .equipmentID) { equipment in
                                     VStack(alignment: .leading, spacing: 8) {
                                         AsyncImage(url: URL(string: equipment.equipmentImage)) { phase in
                                             switch phase {
@@ -204,12 +195,10 @@ struct HomeView: View {
                                         }
                                         .frame(width: 140, height: 100)
                                         .clipShape(RoundedRectangle(cornerRadius: 12))
-                                        
                                         Text(equipment.name)
                                             .font(.subheadline)
                                             .fontWeight(.medium)
                                             .lineLimit(1)
-                                        
                                         Text("₹\(String(format: "%.0f", equipment.pricePerHour))/hr")
                                             .font(.caption)
                                             .foregroundColor(.secondary)
@@ -221,9 +210,40 @@ struct HomeView: View {
                         }
                     }
                 }
+                .padding(.top, 8)
             }
             .background(Color(.systemGroupedBackground))
-            .navigationBarHidden(true)
+            .navigationTitle("Welcome" + (dataController.currentProducer?.name != nil ? ", \(dataController.currentProducer!.name)" : ""))
+            .navigationBarTitleDisplayMode(.large)
+            .navigationBarHidden(false)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    NavigationLink(destination: ProfileView()) {
+                        if let urlString = dataController.currentProducer?.profileimage, let url = URL(string: urlString), !urlString.isEmpty {
+                            AsyncImage(url: url) { phase in
+                                if let image = phase.image {
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                } else if phase.error != nil {
+                                    Image(systemName: "person.circle.fill")
+                                        .resizable()
+                                        .foregroundColor(.gray)
+                                } else {
+                                    ProgressView()
+                                }
+                            }
+                            .frame(width: 32, height: 32)
+                            .clipShape(Circle())
+                        } else {
+                            Image(systemName: "person.circle.fill")
+                                .resizable()
+                                .foregroundColor(.gray)
+                                .frame(width: 32, height: 32)
+                        }
+                    }
+                }
+            }
             .navigationDestination(isPresented: $isRequestsActive) {
                 RequestsView()
             }
@@ -242,5 +262,35 @@ struct HomeView: View {
             }
             .navigationBarBackButtonHidden(false)
         }
+    }
+}
+
+// New QuickAccessButton for grid style
+struct QuickAccessButton: View {
+    let title: String
+    let iconName: String
+    let color: Color
+    let onTap: () -> Void
+    var body: some View {
+        Button(action: onTap) {
+            VStack(spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill(color.opacity(0.15))
+                        .frame(width: 56, height: 56)
+                    Image(systemName: iconName)
+                        .font(.system(size: 24))
+                        .foregroundColor(color)
+                }
+                Text(title)
+                    .font(.body)
+                    .foregroundColor(.primary)
+            }
+            .frame(maxWidth: .infinity, minHeight: 100)
+            .background(Color.white)
+            .cornerRadius(16)
+            .shadow(color: Color.black.opacity(0.03), radius: 2, x: 0, y: 1)
+        }
+        .buttonStyle(PlainButtonStyle())
     }
 }
