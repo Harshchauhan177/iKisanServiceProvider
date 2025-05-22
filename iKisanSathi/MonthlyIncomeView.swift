@@ -126,6 +126,7 @@ struct MonthlyIncomeView: View {
                                  selection: $selectedMonth,
                                  displayedComponents: [.date])
                             .datePickerStyle(.graphical)
+                            .frame(maxHeight: 400)
                             .padding()
                     }
                     

@@ -26,19 +26,19 @@ struct MyEquipmentView: View {
                             .foregroundColor(.secondary)
                     }
                 } else {
-                    ScrollView {
-                        LazyVGrid(columns: [
-                            GridItem(.flexible()),
-                            GridItem(.flexible())
+            ScrollView {
+                LazyVGrid(columns: [
+                    GridItem(.flexible()),
+                    GridItem(.flexible())
                         ], spacing: 16) {
-                            ForEach(Array(dataController.equipmentDetails.values), id: \.equipmentID) { equipment in
-                                EquipmentCard(equipment: equipment, onEdit: {
-                                    selectedEquipment = equipment
-                                    showingEditSheet = true
-                                })
-                                .padding(4)
-                            }
-                        }
+                    ForEach(Array(dataController.equipmentDetails.values), id: \.equipmentID) { equipment in
+                        EquipmentCard(equipment: equipment, onEdit: {
+                            selectedEquipment = equipment
+                            showingEditSheet = true
+                        })
+                        .padding(4)
+                    }
+                }
                         .padding()
                     }
                     .refreshable {
@@ -68,7 +68,7 @@ struct MyEquipmentView: View {
                 if let equipment = selectedEquipment {
                     EditEquipmentView(equipment: equipment)
                         .onDisappear {
-                            Task {
+                Task {
                                 await loadEquipment()
                             }
                         }
@@ -81,8 +81,8 @@ struct MyEquipmentView: View {
             }
             .task {
                 await loadEquipment()
+                }
             }
-        }
     }
     
     private func loadEquipment() async {

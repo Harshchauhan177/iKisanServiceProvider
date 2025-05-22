@@ -20,16 +20,140 @@ enum AuthError: Error, LocalizedError {
 
 
 class DataController: ObservableObject {
-    private let supabase = SupabaseClient(
-        supabaseURL: URL(string: "https://pxuuupiqeipyemluyers.supabase.co")!,
-        supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB4dXV1cGlxZWlweWVtbHV5ZXJzIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0NTMwNTMzNCwiZXhwIjoyMDYwODgxMzM0fQ.KGIxp5mM10AyHoCFNV0uJNanFqw7AqH8MXrwmFTNSCI"
-    )
+    // Shared URLSession for all network requests
+    private static let sharedSession: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.waitsForConnectivity = true
+        config.timeoutIntervalForRequest = 30
+        config.timeoutIntervalForResource = 300
+        
+        // Set proper TLS security
+        config.tlsMinimumSupportedProtocolVersion = .TLSv12
+        config.tlsMaximumSupportedProtocolVersion = .TLSv13
+        
+        // Enable all security features
+        config.httpShouldSetCookies = true
+        config.httpCookieAcceptPolicy = .always
+        config.httpShouldUsePipelining = true
+        config.requestCachePolicy = .reloadIgnoringLocalCacheData
+        
+        return URLSession(configuration: config)
+    }()
     
-    @Published var isAuthenticated = false
+    private lazy var supabase: SupabaseClient = {
+        return SupabaseClient(
+            supabaseURL: URL(string: "https://pxuuupiqeipyemluyers.supabase.co")!,
+            supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB4dXV1cGlxZWlweWVtbHV5ZXJzIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0NTMwNTMzNCwiZXhwIjoyMDYwODgxMzM0fQ.KGIxp5mM10AyHoCFNV0uJNanFqw7AqH8MXrwmFTNSCI"
+        )
+    }()
+    
+    @Published var isAuthenticated = false {
+        didSet {
+            // Whenever authentication state changes, update UserDefaults
+            UserDefaults.standard.set(isAuthenticated, forKey: "isAuthenticated")
+        }
+    }
     @Published var currentUser: User?
     @Published var isOTPSent = false
     @Published var isOTPVerified = false
     @Published var tempEmail: String?
+    
+    private let accessTokenKey = "supabase_access_token"
+    private let refreshTokenKey = "supabase_refresh_token"
+    private let userKey = "current_user"
+    private var sessionRestoreRetryCount = 0
+    private let maxSessionRestoreRetries = 3
+    private let retryDelayBase: UInt64 = 1_000_000_000 // 1 second in nanoseconds
+    
+    init() {
+        // Check if user was previously authenticated
+        isAuthenticated = UserDefaults.standard.bool(forKey: "isAuthenticated")
+        
+        // Try to restore the current user
+        if let userData = UserDefaults.standard.data(forKey: userKey),
+           let user = try? JSONDecoder().decode(User.self, from: userData) {
+            self.currentUser = user
+        }
+        
+        // If we have a stored session, try to restore it
+        if isAuthenticated {
+            Task {
+                await restoreSession()
+            }
+        }
+    }
+    
+    private func restoreSession() async {
+        print("🔄 Attempting to restore session...")
+        
+        guard sessionRestoreRetryCount < maxSessionRestoreRetries else {
+            print("⚠️ Maximum session restore retries reached")
+            clearStoredSession()
+            return
+        }
+        
+        guard let accessToken = UserDefaults.standard.string(forKey: accessTokenKey),
+              let refreshToken = UserDefaults.standard.string(forKey: refreshTokenKey) else {
+            print("ℹ️ No stored tokens found")
+            DispatchQueue.main.async {
+                self.isAuthenticated = false
+            }
+            return
+        }
+        
+        print("🔑 Found stored tokens, attempting to restore session...")
+        
+        do {
+            // Exponential backoff delay
+            if sessionRestoreRetryCount > 0 {
+                let delay = retryDelayBase * UInt64(pow(2.0, Double(sessionRestoreRetryCount - 1)))
+                try await Task.sleep(nanoseconds: delay)
+            }
+            
+            // Try to restore session
+            try await supabase.auth.setSession(accessToken: accessToken, refreshToken: refreshToken)
+            
+            // Verify session is valid
+            if let session = supabase.auth.currentSession {
+                print("✅ Session restored successfully")
+                
+                // Fetch user data
+                try await fetchProducerDetails()
+                try await fetchProducerEquipmentAndRequests()
+                
+                // Reset retry count on success
+                sessionRestoreRetryCount = 0
+                print("✅ Session and user data restored successfully")
+            } else {
+                throw NSError(domain: "Session", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid session"])
+            }
+        } catch {
+            print("⚠️ Error restoring session (attempt \(sessionRestoreRetryCount + 1)): \(error)")
+            sessionRestoreRetryCount += 1
+            
+            // If it's a network error, retry
+            if (error as NSError).domain == NSURLErrorDomain {
+                await restoreSession()
+            } else {
+                // For other errors, clear the session
+                clearStoredSession()
+            }
+        }
+    }
+    
+    private func clearStoredSession() {
+        print("🧹 Clearing stored session...")
+        UserDefaults.standard.removeObject(forKey: accessTokenKey)
+        UserDefaults.standard.removeObject(forKey: refreshTokenKey)
+        UserDefaults.standard.removeObject(forKey: userKey)
+        UserDefaults.standard.removeObject(forKey: "isAuthenticated")
+        
+        DispatchQueue.main.async {
+            self.isAuthenticated = false
+            self.currentUser = nil
+            self.currentProducer = nil
+        }
+    }
     
     struct User: Codable {
         let id: UUID
@@ -198,10 +322,24 @@ class DataController: ObservableObject {
     }
     
     func signIn(email: String, password: String) async throws {
+        print("🔑 Attempting sign in...")
         let authResponse = try await supabase.auth.signIn(email: email, password: password)
         
-        // Store session state
-        UserDefaults.standard.set(true, forKey: "hasSession")
+        // Store tokens
+        if let session = supabase.auth.currentSession {
+            print("📝 Storing session tokens...")
+            UserDefaults.standard.set(session.accessToken, forKey: accessTokenKey)
+            UserDefaults.standard.set(session.refreshToken, forKey: refreshTokenKey)
+            
+            // Store user data
+            let userData = try JSONEncoder().encode(User(
+                id: authResponse.user.id,
+                email: authResponse.user.email ?? "",
+                createdAt: authResponse.user.createdAt
+            ))
+            UserDefaults.standard.set(userData, forKey: userKey)
+            print("✅ Session tokens stored successfully")
+        }
         
         // Set current user
         let user = User(
@@ -210,6 +348,7 @@ class DataController: ObservableObject {
             createdAt: authResponse.user.createdAt
         )
         
+        print("👤 Fetching producer details...")
         // Fetch producer details
         let producerResponse = try await supabase.database
             .from("producer")
@@ -226,9 +365,12 @@ class DataController: ObservableObject {
             self.currentProducer = producer
             self.isAuthenticated = true
         }
+        
+        print("✅ Sign in successful")
     }
     
     func signOut() async throws {
+        print("🚪 Signing out...")
         // Clear Supabase session
         try await supabase.auth.signOut()
         
@@ -236,21 +378,28 @@ class DataController: ObservableObject {
         DispatchQueue.main.async {
             self.isAuthenticated = false
             self.currentUser = nil
+            self.currentProducer = nil
             self.isOTPSent = false
             self.isOTPVerified = false
             self.tempEmail = nil
+            self.equipmentDetails = [:]
+            self.producerEquipment = []
+            self.producerRequests = []
         }
         
-        // Clear any stored session data
-        UserDefaults.standard.removeObject(forKey: "hasSession")
+        // Clear stored session
+        clearStoredSession()
+        print("✅ Sign out complete")
     }
     
     func checkSession() async {
+        print("🔐 Checking session...")
         if let session = supabase.auth.currentSession {
             // Valid session exists
             let user = session.user
             
             do {
+                print("📱 Found existing session, fetching user details...")
                 // Fetch producer details
                 let producerResponse = try await supabase.database
                     .from("producer")
@@ -271,29 +420,17 @@ class DataController: ObservableObject {
                     self.currentProducer = producer
                     self.isAuthenticated = true
                 }
-            } catch {
-                print("⚠️ Error fetching producer details: \(error)")
-                // Still set the user but without producer details
-                DispatchQueue.main.async {
-                    self.currentUser = User(
-                        id: user.id,
-                        email: user.email ?? "",
-                        createdAt: user.createdAt
-                    )
-                    self.isAuthenticated = true
-                }
-            }
-            
-            // Verify if the session is still valid with the server
-            do {
-                _ = try await supabase.auth.session
-                // Session is valid, fetch data
+                
+                // Fetch additional data
                 try await fetchProducerEquipmentAndRequests()
+                print("✅ Session restored successfully")
             } catch {
-                // Session is invalid, sign out
+                print("⚠️ Error restoring session: \(error)")
+                // Session is invalid or there was an error
                 try? await signOut()
             }
         } else {
+            print("ℹ️ No active session found")
             // No active session
             DispatchQueue.main.async {
                 self.currentUser = nil
