@@ -5,23 +5,46 @@ struct MyEquipmentView: View {
     @State private var showingAddEquipment = false
     @State private var selectedEquipment: DataController.Equipment?
     @State private var showingEditSheet = false
+    @State private var isLoading = false
+    @State private var errorMessage: String?
+    @State private var showError = false
     
     var body: some View {
         NavigationView {
-            ScrollView {
-                LazyVGrid(columns: [
-                    GridItem(.flexible()),
-                    GridItem(.flexible())
-                ], spacing: 0) {
-                    ForEach(Array(dataController.equipmentDetails.values), id: \.equipmentID) { equipment in
-                        EquipmentCard(equipment: equipment, onEdit: {
-                            selectedEquipment = equipment
-                            showingEditSheet = true
-                        })
-                        .padding(4)
+            ZStack {
+                if isLoading {
+                    ProgressView("Loading equipment...")
+                } else if dataController.equipmentDetails.isEmpty {
+                    VStack(spacing: 16) {
+                        Image(systemName: "wrench.and.screwdriver")
+                            .font(.system(size: 50))
+                            .foregroundColor(.gray)
+                        Text("No equipment added yet")
+                            .font(.headline)
+                        Text("Tap + to add your first equipment")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                } else {
+                    ScrollView {
+                        LazyVGrid(columns: [
+                            GridItem(.flexible()),
+                            GridItem(.flexible())
+                        ], spacing: 16) {
+                            ForEach(Array(dataController.equipmentDetails.values), id: \.equipmentID) { equipment in
+                                EquipmentCard(equipment: equipment, onEdit: {
+                                    selectedEquipment = equipment
+                                    showingEditSheet = true
+                                })
+                                .padding(4)
+                            }
+                        }
+                        .padding()
+                    }
+                    .refreshable {
+                        await loadEquipment()
                     }
                 }
-                .padding(4)
             }
             .navigationTitle("My Equipment")
             .toolbar {
@@ -35,25 +58,42 @@ struct MyEquipmentView: View {
             }
             .sheet(isPresented: $showingAddEquipment) {
                 AddEquipmentView()
+                    .onDisappear {
+                        Task {
+                            await loadEquipment()
+                        }
+                    }
             }
             .sheet(isPresented: $showingEditSheet) {
                 if let equipment = selectedEquipment {
                     EditEquipmentView(equipment: equipment)
+                        .onDisappear {
+                            Task {
+                                await loadEquipment()
+                            }
+                        }
                 }
             }
-            .onAppear {
-                Task {
-                    try? await dataController.fetchProducerEquipmentAndRequests()
-                }
+            .alert("Error", isPresented: $showError) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(errorMessage ?? "An unknown error occurred")
             }
-            .onChange(of: showingAddEquipment) { isShowing in
-                if !isShowing {
-                    Task {
-                        try? await dataController.fetchProducerEquipmentAndRequests()
-                    }
-                }
+            .task {
+                await loadEquipment()
             }
         }
+    }
+    
+    private func loadEquipment() async {
+        isLoading = true
+        do {
+            try await dataController.fetchProducerEquipmentAndRequests()
+        } catch {
+            errorMessage = error.localizedDescription
+            showError = true
+        }
+        isLoading = false
     }
 }
 
@@ -174,3 +214,4 @@ struct EquipmentCard: View {
         }
     }
 }
+

@@ -100,7 +100,7 @@ struct HomeView: View {
                 VStack(spacing: 24) {
                     // Subtitle below large title
                     HStack {
-                        Text("how are you today?")
+                            Text("how are you today?")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                         Spacer()
@@ -135,9 +135,9 @@ struct HomeView: View {
                     .shadow(color: Color.black.opacity(0.03), radius: 4, x: 0, y: 2)
                     .padding(.horizontal)
                     .onTapGesture {
-                        selectedTab = 2
-                    }
-
+                            selectedTab = 2
+                        }
+                        
                     // Quick Access Grid
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Quick Access")
@@ -146,21 +146,21 @@ struct HomeView: View {
                             .padding(.horizontal)
                         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 20) {
                             QuickAccessButton(title: "Equipment", iconName: "wrench.and.screwdriver.fill", color: .blue) {
-                                selectedTab = 2
-                            }
+                                    selectedTab = 2
+                                }
                             QuickAccessButton(title: "Request", iconName: "doc.fill", color: .green) {
-                                isRequestsActive = true
-                            }
+                                    isRequestsActive = true
+                                }
                             QuickAccessButton(title: "Service", iconName: "wrench.adjustable.fill", color: .purple) {
-                                isServiceRequestsActive = true
-                            }
+                                    isServiceRequestsActive = true
+                                }
                             QuickAccessButton(title: "Income", iconName: "chart.line.uptrend.xyaxis", color: .orange) {
-                                isIncomeAnalysisActive = true
+                                    isIncomeAnalysisActive = true
+                                }
                             }
-                        }
-                        .padding(.horizontal)
+                            .padding(.horizontal)
                     }
-
+                    
                     // Top Equipment
                     VStack(alignment: .leading, spacing: 16) {
                         HStack {

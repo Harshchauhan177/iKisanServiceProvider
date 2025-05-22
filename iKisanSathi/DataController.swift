@@ -58,7 +58,7 @@ class DataController: ObservableObject {
         var description: String?
         let isRecommended: Bool
         let providerName: String
-        let preBookingStatus: String
+        let preBookingStatus: String?
         
         var startDate: Date? {
             let formatter = DateFormatter()
@@ -316,7 +316,7 @@ class DataController: ObservableObject {
     func fetchProducerEquipmentAndRequests() async throws {
         guard let currentUser = currentUser else {
             print("⚠️ No current user found")
-            return
+            throw NSError(domain: "DataController", code: 1, userInfo: [NSLocalizedDescriptionKey: "No user logged in"])
         }
         
         print("🔍 Fetching equipment for user: \(currentUser.id)")
@@ -326,67 +326,69 @@ class DataController: ObservableObject {
             .from("equipment")
             .select()
             .eq("providerID", value: currentUser.id.uuidString)
+            .order("name")  // Order by name for consistent display
             .execute()
         
         print("📦 Equipment response data: \(String(data: equipmentResponse.data, encoding: .utf8) ?? "nil")")
         
-        let equipment = try JSONDecoder().decode([Equipment].self, from: equipmentResponse.data)
-        print("🚜 Found \(equipment.count) equipment items")
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
         
-        // Create a lookup dictionary for equipment details
-        var equipmentDict: [UUID: Equipment] = [:]
-        let equipmentIds: [String] = equipment.compactMap { equip in
-            if equip.providerID == currentUser.id {
+        do {
+            let equipment = try decoder.decode([Equipment].self, from: equipmentResponse.data)
+            print("🚜 Found \(equipment.count) equipment items")
+            
+            // Create a lookup dictionary for equipment details
+            var equipmentDict: [UUID: Equipment] = [:]
+            let equipmentIds: [String] = equipment.map { equip in
                 equipmentDict[equip.equipmentID] = equip
                 return equip.equipmentID.uuidString
             }
-            return nil
-        }
-        
-        print("🔑 Equipment IDs: \(equipmentIds)")
-        
-        // Then fetch all requests for equipment owned by this producer
-        if !equipmentIds.isEmpty {
-            print("📥 Fetching requests for equipment IDs")
-            let requestsResponse = try await supabase.database
-                .from("requests")
-                .select()
-                .in("equipmentId", values: equipmentIds)
-                .eq("status", value: "Pending")  // Only fetch pending requests
-                .execute()
             
-            print("📬 Requests response data: \(String(data: requestsResponse.data, encoding: .utf8) ?? "nil")")
+            print("🔑 Equipment IDs: \(equipmentIds)")
             
-            let requests = try JSONDecoder().decode([Request].self, from: requestsResponse.data)
-            print("📝 Found \(requests.count) total requests")
-            
-            // Filter requests to only include those for this producer's equipment
-            let producerRequests = requests.filter { request in
-                guard let equipmentId = request.equipmentId else {
-                    print("⚠️ Request has no equipment ID")
-                    return false
+            // Then fetch all requests for equipment owned by this producer
+            if !equipmentIds.isEmpty {
+                print("📥 Fetching requests for equipment IDs")
+                let requestsResponse = try await supabase.database
+                    .from("requests")
+                    .select()
+                    .in("equipmentId", values: equipmentIds)
+                    .eq("status", value: "Pending")  // Only fetch pending requests
+                    .execute()
+                
+                print("📬 Requests response data: \(String(data: requestsResponse.data, encoding: .utf8) ?? "nil")")
+                
+                let requests = try decoder.decode([Request].self, from: requestsResponse.data)
+                print("📝 Found \(requests.count) total requests")
+                
+                // Filter requests to only include those for this producer's equipment
+                let producerRequests = requests.filter { request in
+                    guard let equipmentId = request.equipmentId else {
+                        print("⚠️ Request has no equipment ID")
+                        return false
+                    }
+                    return equipmentDict[equipmentId] != nil
                 }
-                let isValid = equipmentDict[equipmentId] != nil
-                if !isValid {
-                    print("⚠️ Request equipment ID \(equipmentId) not found in producer's equipment")
+                
+                print("✅ Found \(producerRequests.count) valid requests for producer")
+                
+                DispatchQueue.main.async {
+                    self.producerRequests = producerRequests
+                    self.producerEquipment = equipment
+                    self.equipmentDetails = equipmentDict
                 }
-                return isValid
+            } else {
+                print("ℹ️ No equipment found for producer")
+                DispatchQueue.main.async {
+                    self.producerRequests = []
+                    self.producerEquipment = []
+                    self.equipmentDetails = [:]
+                }
             }
-            
-            print("✅ Found \(producerRequests.count) valid requests for producer")
-            
-            DispatchQueue.main.async {
-                self.producerRequests = producerRequests
-                self.producerEquipment = equipment
-                self.equipmentDetails = equipmentDict
-            }
-        } else {
-            print("⚠️ No equipment found for producer")
-            DispatchQueue.main.async {
-                self.producerRequests = []
-                self.producerEquipment = []
-                self.equipmentDetails = [:]
-            }
+        } catch {
+            print("❌ Error decoding equipment: \(error)")
+            throw error
         }
     }
     
