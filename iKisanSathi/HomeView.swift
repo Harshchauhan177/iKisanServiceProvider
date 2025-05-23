@@ -207,14 +207,6 @@ struct HomeView: View {
                                                             .foregroundColor(.gray)
                                                     )
                                             }
-                                            
-                                            // Three dots menu button
-                                            Button(action: {}) {
-                                                Image(systemName: "ellipsis")
-                                                    .font(.system(size: 20))
-                                                    .foregroundColor(.white)
-                                                    .padding(8)
-                                            }
                                         }
                                         
                                         VStack(alignment: .leading, spacing: 8) {
