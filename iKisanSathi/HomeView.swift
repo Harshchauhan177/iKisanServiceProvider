@@ -94,6 +94,7 @@ struct HomeView: View {
     @State private var showingProfile = false
     @State private var searchText = ""
     @Binding var selectedTab: Int
+    @State private var showingAddEquipment = false
     
     var body: some View {
         NavigationStack {
@@ -110,35 +111,38 @@ struct HomeView: View {
                     .padding(.top, 2)
 
                     // Add Equipment Card
-                    HStack {
-                        ZStack {
-                            Circle()
-                                .fill(Color.blue.opacity(0.15))
-                                .frame(width: 56, height: 56)
+                    Button {
+                        showingAddEquipment = true
+                    } label: {
+                        HStack(spacing: 16) {
                             Image(systemName: "wrench.and.screwdriver.fill")
-                                .font(.system(size: 28))
+                                .font(.system(size: 24))
                                 .foregroundColor(.blue)
+                                .frame(width: 40, height: 40)
+                                .background(Color.blue.opacity(0.1))
+                                .clipShape(Circle())
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Add Equipment")
+                                    .font(.headline)
+                                    .foregroundColor(.primary)
+                                
+                                Text("List your equipment for service")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            Spacer()
                         }
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Add Equipment")
-                                .font(.title3)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.primary)
-                            Text("List your equipment for service")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                        }
-                        Spacer()
+                        .padding()
+                        .background(Color(.systemBackground))
+                        .cornerRadius(16)
                     }
-                    .padding()
-                    .background(Color.white)
-                    .cornerRadius(20)
-                    .shadow(color: Color.black.opacity(0.03), radius: 4, x: 0, y: 2)
                     .padding(.horizontal)
-                    .onTapGesture {
-                            selectedTab = 2
-                        }
-                        
+                    .sheet(isPresented: $showingAddEquipment) {
+                        AddEquipmentView()
+                    }
+                    
                     // Quick Access Grid
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Quick Access")
@@ -166,51 +170,97 @@ struct HomeView: View {
                     VStack(alignment: .leading, spacing: 16) {
                         HStack {
                             Text("Top Equipment")
-                                .font(.title3)
-                                .fontWeight(.bold)
+                                .font(.title2)
+                                .fontWeight(.semibold)
                             Spacer()
                             Button("See all") {
                                 selectedTab = 2
                             }
+                            .font(.body)
                             .foregroundColor(.blue)
                         }
                         .padding(.horizontal)
-                        // Keep the equipment cards horizontally scrollable as before
+                        
                         ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 16) {
-                                ForEach(Array(dataController.equipmentDetails.values.prefix(5)), id: \ .equipmentID) { equipment in
-                                    VStack(alignment: .leading, spacing: 8) {
-                                        if let url = URL(string: equipment.equipmentImage) {
-                                            WebImage(url: url)
-                                                .resizable()
-                                                .scaledToFill()
-                                                .frame(width: 140, height: 100)
-                                                .clipped()
-                                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                                                .overlay(Group {
-                                                    if !equipment.equipmentImage.isEmpty {
-                                                        EmptyView()
-                                                    } else {
-                                                        Color.gray.opacity(0.3)
-                                                    }
-                                                })
-                                        } else {
-                                            Color.gray.opacity(0.3)
-                                                .frame(width: 140, height: 100)
-                                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                            HStack(spacing: 12) {
+                                ForEach(Array(dataController.equipmentDetails.values.prefix(5)), id: \.equipmentID) { equipment in
+                                    VStack(alignment: .leading, spacing: 0) {
+                                        ZStack(alignment: .topTrailing) {
+                                            if let url = URL(string: equipment.equipmentImage) {
+                                                WebImage(url: url)
+                                                    .resizable()
+                                                    .scaledToFill()
+                                                    .frame(width: 180, height: 180)
+                                                    .clipped()
+                                                    .clipShape(
+                                                        RoundedCorner(radius: 12, corners: [.topLeft, .topRight])
+                                                    )
+                                            } else {
+                                                Color(.systemGray5)
+                                                    .frame(width: 180, height: 180)
+                                                    .clipShape(
+                                                        RoundedCorner(radius: 12, corners: [.topLeft, .topRight])
+                                                    )
+                                                    .overlay(
+                                                        Image(systemName: "photo")
+                                                            .font(.system(size: 30))
+                                                            .foregroundColor(.gray)
+                                                    )
+                                            }
+                                            
+                                            // Three dots menu button
+                                            Button(action: {}) {
+                                                Image(systemName: "ellipsis")
+                                                    .font(.system(size: 20))
+                                                    .foregroundColor(.white)
+                                                    .padding(8)
+                                            }
                                         }
-                                        Text(equipment.name)
-                                            .font(.subheadline)
-                                            .fontWeight(.medium)
-                                            .lineLimit(1)
-                                        Text("₹\(String(format: "%.0f", equipment.pricePerHour))/hr")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
+                                        
+                                        VStack(alignment: .leading, spacing: 8) {
+                                            Text(equipment.name)
+                                                .font(.system(size: 17, weight: .semibold))
+                                                .foregroundColor(.primary)
+                                                .lineLimit(1)
+                                            
+                                            // Pricing row
+                                            HStack {
+                                                // Per Hour
+                                                VStack(alignment: .leading) {
+                                                    Text("Per Hour")
+                                                        .font(.system(size: 13))
+                                                        .foregroundColor(.secondary)
+                                                    Text("₹\(String(format: "%.0f", equipment.pricePerHour))")
+                                                        .font(.system(size: 15, weight: .medium))
+                                                        .foregroundColor(.primary)
+                                                }
+                                                
+                                                Spacer()
+                                                
+                                                // Per Acre
+                                                VStack(alignment: .leading) {
+                                                    Text("Per Acre")
+                                                        .font(.system(size: 13))
+                                                        .foregroundColor(.secondary)
+                                                    Text("₹\(String(format: "%.0f", equipment.pricePerAcre))")
+                                                        .font(.system(size: 15, weight: .medium))
+                                                        .foregroundColor(.primary)
+                                                }
+                                                
+//                                                Spacer()
+                                            }
+                                        }
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 12)
                                     }
-                                    .frame(width: 140)
+                                    .frame(width: 180)
+                                    .background(Color(.systemBackground))
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
                                 }
                             }
                             .padding(.horizontal)
+                            .padding(.bottom, 4)
                         }
                     }
                 }
@@ -296,5 +346,19 @@ struct QuickAccessButton: View {
             .shadow(color: Color.black.opacity(0.03), radius: 2, x: 0, y: 1)
         }
         .buttonStyle(PlainButtonStyle())
+    }
+}
+
+struct RoundedCorner: Shape {
+    var radius: CGFloat
+    var corners: UIRectCorner
+    
+    func path(in rect: CGRect) -> Path {
+        let path = UIBezierPath(
+            roundedRect: rect,
+            byRoundingCorners: corners,
+            cornerRadii: CGSize(width: radius, height: radius)
+        )
+        return Path(path.cgPath)
     }
 }
