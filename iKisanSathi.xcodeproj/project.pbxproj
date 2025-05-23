@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		3A3510A32DE06C250043F47E /* SDWebImageSwiftUI in Frameworks */ = {isa = PBXBuildFile; productRef = 3A3510A22DE06C250043F47E /* SDWebImageSwiftUI */; };
 		97C298992DD5B4080099CABD /* Auth in Frameworks */ = {isa = PBXBuildFile; productRef = 97C298982DD5B4080099CABD /* Auth */; };
 		97C2989B2DD5B4080099CABD /* Functions in Frameworks */ = {isa = PBXBuildFile; productRef = 97C2989A2DD5B4080099CABD /* Functions */; };
 		97C2989D2DD5B4080099CABD /* PostgREST in Frameworks */ = {isa = PBXBuildFile; productRef = 97C2989C2DD5B4080099CABD /* PostgREST */; };
@@ -32,6 +33,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3A3510A32DE06C250043F47E /* SDWebImageSwiftUI in Frameworks */,
 				97C2989D2DD5B4080099CABD /* PostgREST in Frameworks */,
 				97C2989B2DD5B4080099CABD /* Functions in Frameworks */,
 				97C298A42DD5B4130099CABD /* Supabase in Frameworks */,
@@ -94,6 +96,7 @@
 				97C2989E2DD5B4080099CABD /* Realtime */,
 				97C298A02DD5B4080099CABD /* Storage */,
 				97C298A32DD5B4130099CABD /* Supabase */,
+				3A3510A22DE06C250043F47E /* SDWebImageSwiftUI */,
 			);
 			productName = iKasanproducer;
 			productReference = 97C298742DD5AF700099CABD /* iKisanSathi.app */;
@@ -125,6 +128,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				97C298972DD5B4080099CABD /* XCRemoteSwiftPackageReference "supabase-swift" */,
+				3A3510A12DE06C250043F47E /* XCRemoteSwiftPackageReference "SDWebImageSwiftUI" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 97C298752DD5AF700099CABD /* Products */;
@@ -358,6 +362,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		3A3510A12DE06C250043F47E /* XCRemoteSwiftPackageReference "SDWebImageSwiftUI" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/SDWebImage/SDWebImageSwiftUI.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 3.1.3;
+			};
+		};
 		97C298972DD5B4080099CABD /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/supabase-community/supabase-swift";
@@ -369,6 +381,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		3A3510A22DE06C250043F47E /* SDWebImageSwiftUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3A3510A12DE06C250043F47E /* XCRemoteSwiftPackageReference "SDWebImageSwiftUI" */;
+			productName = SDWebImageSwiftUI;
+		};
 		97C298982DD5B4080099CABD /* Auth */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 97C298972DD5B4080099CABD /* XCRemoteSwiftPackageReference "supabase-swift" */;

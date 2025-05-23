@@ -1,4 +1,5 @@
 import SwiftUI
+import SDWebImageSwiftUI
 
 struct FeatureCard: View {
     let title: String
@@ -179,22 +180,25 @@ struct HomeView: View {
                             HStack(spacing: 16) {
                                 ForEach(Array(dataController.equipmentDetails.values.prefix(5)), id: \ .equipmentID) { equipment in
                                     VStack(alignment: .leading, spacing: 8) {
-                                        AsyncImage(url: URL(string: equipment.equipmentImage)) { phase in
-                                            switch phase {
-                                            case .empty:
-                                                Color.gray.opacity(0.3)
-                                            case .success(let image):
-                                                image
-                                                    .resizable()
-                                                    .aspectRatio(contentMode: .fill)
-                                            case .failure:
-                                                Color.gray.opacity(0.3)
-                                            @unknown default:
-                                                EmptyView()
-                                            }
+                                        if let url = URL(string: equipment.equipmentImage) {
+                                            WebImage(url: url)
+                                                .resizable()
+                                                .scaledToFill()
+                                                .frame(width: 140, height: 100)
+                                                .clipped()
+                                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                                .overlay(Group {
+                                                    if !equipment.equipmentImage.isEmpty {
+                                                        EmptyView()
+                                                    } else {
+                                                        Color.gray.opacity(0.3)
+                                                    }
+                                                })
+                                        } else {
+                                            Color.gray.opacity(0.3)
+                                                .frame(width: 140, height: 100)
+                                                .clipShape(RoundedRectangle(cornerRadius: 12))
                                         }
-                                        .frame(width: 140, height: 100)
-                                        .clipShape(RoundedRectangle(cornerRadius: 12))
                                         Text(equipment.name)
                                             .font(.subheadline)
                                             .fontWeight(.medium)
@@ -219,22 +223,22 @@ struct HomeView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     NavigationLink(destination: ProfileView()) {
-                        if let urlString = dataController.currentProducer?.profileimage, let url = URL(string: urlString), !urlString.isEmpty {
-                            AsyncImage(url: url) { phase in
-                                if let image = phase.image {
-                                    image
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fill)
-                                } else if phase.error != nil {
-                                    Image(systemName: "person.circle.fill")
-                                        .resizable()
-                                        .foregroundColor(.gray)
-                                } else {
-                                    ProgressView()
-                                }
-                            }
-                            .frame(width: 32, height: 32)
-                            .clipShape(Circle())
+                        if let urlString = dataController.currentProducer?.profileimage,
+                           let url = URL(string: urlString),
+                           !urlString.isEmpty {
+                            WebImage(url: url)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 32, height: 32)
+                                .clipped()
+                                .clipShape(Circle())
+                                .overlay(Group {
+                                    if urlString.isEmpty {
+                                        Image(systemName: "person.circle.fill")
+                                            .resizable()
+                                            .foregroundColor(.gray)
+                                    }
+                                })
                         } else {
                             Image(systemName: "person.circle.fill")
                                 .resizable()

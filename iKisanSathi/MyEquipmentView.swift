@@ -1,4 +1,5 @@
 import SwiftUI
+import SDWebImageSwiftUI
 
 struct MyEquipmentView: View {
     @EnvironmentObject var dataController: DataController
@@ -112,26 +113,27 @@ struct EquipmentCard: View {
             GeometryReader { geometry in
                 ZStack(alignment: .topTrailing) {
                     Color(.systemGray5)
-                    AsyncImage(url: URL(string: equipment.equipmentImage)) { phase in
-                        switch phase {
-                        case .empty:
-                            Image(systemName: "photo")
-                                .font(.system(size: 24))
-                                .foregroundColor(.gray)
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                                .frame(width: geometry.size.width, height: geometry.size.width)
-                        case .failure(_):
-                            Image(systemName: "photo")
-                                .font(.system(size: 24))
-                                .foregroundColor(.gray)
-                        @unknown default:
-                            EmptyView()
-                        }
+                    if let url = URL(string: equipment.equipmentImage) {
+                        WebImage(url: url)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: geometry.size.width, height: geometry.size.width)
+                            .clipped()
+                            .overlay(Group {
+                                if !equipment.equipmentImage.isEmpty {
+                                    EmptyView()
+                                } else {
+                                    Image(systemName: "photo")
+                                        .font(.system(size: 24))
+                                        .foregroundColor(.gray)
+                                }
+                            })
+                    } else {
+                        Image(systemName: "photo")
+                            .font(.system(size: 24))
+                            .foregroundColor(.gray)
+                            .frame(width: geometry.size.width, height: geometry.size.width)
                     }
-                    .clipped()
                     
                     Button {
                         showingActionSheet = true
