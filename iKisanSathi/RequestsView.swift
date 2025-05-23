@@ -1,4 +1,5 @@
 import SwiftUI
+import SDWebImageSwiftUI
 
 struct RequestsView: View {
     @EnvironmentObject var dataController: DataController
@@ -6,6 +7,17 @@ struct RequestsView: View {
     
     var body: some View {
         ZStack {
+            // Background
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    Color(.systemGray6),
+                    Color(.systemGray5).opacity(0.5)
+                ]),
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+            
             if isLoading {
                 ProgressView()
             } else if dataController.producerRequests.isEmpty {
@@ -23,8 +35,8 @@ struct RequestsView: View {
                     LazyVStack(spacing: 12) {
                         ForEach(dataController.producerRequests) { request in
                             RequestRow(request: request, equipment: dataController.equipmentDetails[request.equipmentId ?? UUID()])
+                                .padding(.horizontal)
                         }
-                        .padding(.horizontal)
                     }
                     .padding(.vertical)
                 }
@@ -41,9 +53,8 @@ struct RequestsView: View {
             }
             isLoading = false
         }
-        }
     }
-
+}
 
 struct RequestRow: View {
     let request: Request
@@ -53,144 +64,101 @@ struct RequestRow: View {
     @State private var isLoading = false
     @State private var showError = false
     @State private var errorMessage = ""
+    @State private var showingEditSheet = false
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            if let equipment = equipment {
-                HStack(spacing: 16) {
-                    // Equipment Image
-                    AsyncImage(url: URL(string: equipment.equipmentImage)) { image in
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } placeholder: {
-                        Color(.systemGray5)
-                            .overlay(
-                                Image(systemName: "photo")
-                                    .font(.system(size: 24))
-                                    .foregroundColor(.gray)
-                            )
-                    }
-                    .frame(width: 100, height: 100)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+        VStack(alignment: .leading, spacing: 16) {
+            // Header with Equipment Image and Details
+            HStack(spacing: 12) {
+                if let equipment = equipment {
+                    WebImage(url: URL(string: equipment.equipmentImage))
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 80, height: 80)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(Color(.systemGray5), lineWidth: 1)
+                        )
                     
-                    // Equipment Details
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(equipment.name)
-                            .font(.title3)
-                            .fontWeight(.semibold)
+                        HStack {
+                            Text(equipment.name)
+                                .font(.headline)
+                                .foregroundColor(.primary)
+                            
+                            Spacer()
+                            
+                            // Time Slot next to name
+                            HStack(spacing: 6) {
+                                Image(systemName: "clock")
+                                    .foregroundColor(.orange)
+                                Text("\(request.timePeriod ?? "")")
+                                    .font(.subheadline)
+                                    .foregroundColor(.primary)
+                            }
+                        }
                         
                         Text(equipment.type)
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                         
                         Text("Capacity: \(equipment.capacity)")
-                            .font(.subheadline)
+                            .font(.caption)
                             .foregroundColor(.secondary)
                     }
+                    
+                    Spacer()
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 16)
             }
             
             // Request Details
-            VStack(spacing: 16) {
-                HStack(spacing: 24) {
-                    // Date with acres
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "calendar")
-                                .foregroundColor(.blue)
-                            if let date = request.date {
-                                Text(date, style: .date)
-                                    .fontWeight(.medium)
-                            }
-                        }
-                        if request.type == .coEquip {
-                            Text("\(String(format: "%.1f", request.area)) acres")
+            VStack(spacing: 12) {
+                // Date and Area
+                HStack {
+                    // Date
+                    HStack(spacing: 6) {
+                        Image(systemName: "calendar")
+                            .foregroundColor(.blue)
+                        if let date = request.date {
+                            Text(date, style: .date)
                                 .font(.subheadline)
-                                .foregroundColor(.blue)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Color.blue.opacity(0.1))
-                                .cornerRadius(6)
+                                .foregroundColor(.primary)
                         }
                     }
                     
-                    Divider()
+                    Spacer()
                     
-                    // Location
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "location.fill")
-                                .foregroundColor(.red)
-                            Text(request.location)
-                                .fontWeight(.medium)
-                        }
+                    // Area
+                    if request.type == .coEquip {
+                        Text("\(String(format: "%.1f", request.area)) acres")
+                            .font(.subheadline)
+                            .foregroundColor(.blue)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.blue.opacity(0.1))
+                            .cornerRadius(8)
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 16)
                 
                 Divider()
-                    .padding(.horizontal, 16)
-                
-                // Time and Type
-                HStack(spacing: 24) {
-                    // Time
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "clock.fill")
-                                .foregroundColor(.orange)
-                            Text(request.timeSlot.rawValue)
-                                .fontWeight(.medium)
-                        }
-                        if let period = request.timePeriod {
-                            Text(period)
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    
-                    Divider()
-                    
-                    // Request Type
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "bell.fill")
-                                .foregroundColor(.purple)
-                            Text(request.typeOfRequest.rawValue)
-                                .fontWeight(.medium)
-                        }
-                        Text(request.type.rawValue)
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
                 
                 // Action Buttons
-                HStack(spacing: 16) {
+                HStack(spacing: 12) {
                     Button(action: {
                         Task {
                             await handleAcceptRequest()
                         }
                     }) {
-                        HStack(spacing: 8) {
+                        HStack {
                             Image(systemName: "checkmark.circle.fill")
                             Text("Accept")
-                                .fontWeight(.medium)
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(
-                            LinearGradient(gradient: Gradient(colors: [Color.green, Color.green.opacity(0.8)]),
-                                         startPoint: .topLeading,
-                                         endPoint: .bottomTrailing)
-                        )
+                        .padding(.vertical, 12)
+                        .background(Color.green)
                         .foregroundColor(.white)
-                        .cornerRadius(12)
+                        .cornerRadius(10)
                     }
                     
                     Button(action: {
@@ -198,31 +166,24 @@ struct RequestRow: View {
                             await handleDeleteRequest()
                         }
                     }) {
-                        HStack(spacing: 8) {
+                        HStack {
                             Image(systemName: "trash.fill")
                             Text("Delete")
-                                .fontWeight(.medium)
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(
-                            LinearGradient(gradient: Gradient(colors: [Color.red, Color.red.opacity(0.8)]),
-                                         startPoint: .topLeading,
-                                         endPoint: .bottomTrailing)
-                        )
+                        .padding(.vertical, 12)
+                        .background(Color.red)
                         .foregroundColor(.white)
-                        .cornerRadius(12)
+                        .cornerRadius(10)
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 16)
-                .disabled(isLoading)
-                .opacity(isLoading ? 0.6 : 1)
+                .font(.subheadline.bold())
             }
         }
+        .padding(16)
         .background(Color(.systemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))
-        .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 4)
+        .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 2)
         .overlay(Group {
             if isLoading {
                 Color.black.opacity(0.3)
@@ -231,24 +192,16 @@ struct RequestRow: View {
             }
         })
         .alert("Error", isPresented: $showError) {
-            Button("OK", role: .cancel) {}
+            Button("OK", role: .cancel) { }
         } message: {
             Text(errorMessage)
         }
         .scaleEffect(isPressed ? 0.98 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isPressed)
-    }
-    
-    private func infoRow<Content: View>(
-        icon: String,
-        @ViewBuilder content: @escaping () -> Content
-    ) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.system(size: 14))
-                .foregroundColor(.secondary)
-                .frame(width: 20)
-            content()
+        .sheet(isPresented: $showingEditSheet) {
+            if let equipment = equipment {
+                EditEquipmentView(equipment: equipment)
+            }
         }
     }
     
@@ -273,19 +226,6 @@ struct RequestRow: View {
             isLoading = false
             errorMessage = error.localizedDescription
             showError = true
-        }
-    }
-    
-    private var statusColor: Color {
-        switch request.status {
-        case .pending:
-            return .orange
-        case .confirmed:
-            return .green
-//        case .rejected:
-//            return .red
-        case .completed:
-            return .blue
         }
     }
 }
