@@ -12,18 +12,82 @@ enum coEquipState: String, Codable {
     case Unavailable
 }
 
+enum BookingType: String, Codable {
+    case coEquip = "Co-Equip"
+    case individual = "Individual"
+    case prebooking = "Prebooking" // Added to handle "Prebooking" from DB
+    case onDemand = "On-Demand"   // Added to handle "On-Demand" from DB
+}
+
 enum BookingStatus: String, Codable {
     case pending = "Pending"
     case confirmed = "Confirmed"
     case completed = "Completed"
+    case cancelled = "cancelled"
 }
 
-enum BookingType: String, Codable {
-    case coEquip = "Co-Equip"
-    case individual = "Individual"
+enum BookingSource: String, Codable {
+    case home = "home"
+    case prebooking = "prebooking"
 }
 
-
+struct Booking: Codable, Identifiable {
+    let id: UUID
+    let userId: UUID?
+    let equipmentId: UUID?
+    let bookingType: BookingType
+    let bookingDate: Date
+    let fieldArea: Double
+    let status: BookingStatus
+    let timeSlot: TimeSlot
+    let source: BookingSource
+    let latitude: Double?
+    let longitude: Double?
+    let address: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case id = "bookingID"
+        case userId = "userID"
+        case equipmentId = "equipmentID"
+        case bookingType
+        case bookingDate
+        case fieldArea
+        case status
+        case timeSlot
+        case source
+        case latitude
+        case longitude
+        case address
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        userId = try container.decodeIfPresent(UUID.self, forKey: .userId)
+        equipmentId = try container.decodeIfPresent(UUID.self, forKey: .equipmentId)
+        bookingType = try container.decode(BookingType.self, forKey: .bookingType)
+        
+        // Decode the timestamp string to Date
+        let dateString = try container.decode(String.self, forKey: .bookingDate)
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
+        if let date = formatter.date(from: dateString) {
+            bookingDate = date
+        } else {
+            throw DecodingError.dataCorruptedError(forKey: .bookingDate,
+                                                  in: container,
+                                                  debugDescription: "Date string does not match expected format")
+        }
+        
+        fieldArea = try container.decode(Double.self, forKey: .fieldArea)
+        status = try container.decode(BookingStatus.self, forKey: .status)
+        timeSlot = try container.decode(TimeSlot.self, forKey: .timeSlot)
+        source = try container.decode(BookingSource.self, forKey: .source)
+        latitude = try container.decodeIfPresent(Double.self, forKey: .latitude)
+        longitude = try container.decodeIfPresent(Double.self, forKey: .longitude)
+        address = try container.decodeIfPresent(String.self, forKey: .address)
+    }
+}
 
 enum TimeSlot: String, Codable {
     case morning = "morning"
@@ -53,7 +117,7 @@ enum TimeSlot: String, Codable {
 
 enum RequestType: String, Codable {
     case myRequest = "myRequest"
-    case scheduled = "scheduled"
+    case joinedRequest = "acceptedRequest"
 }
 
 struct MonthlyIncome: Codable, Identifiable {

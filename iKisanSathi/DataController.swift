@@ -20,6 +20,8 @@ enum AuthError: Error, LocalizedError {
 
 
 class DataController: ObservableObject {
+    @Published var producerBookings: [Booking] = []
+    
     // Shared URLSession for all network requests
     private static let sharedSession: URLSession = {
         let config = URLSessionConfiguration.default
@@ -1050,5 +1052,70 @@ class DataController: ObservableObject {
         let publicURL = "https://pxuuupiqeipyemluyers.supabase.co/storage/v1/object/public/equipment/\(filePath)"
         
         return publicURL
+    }
+    
+    func fetchBookings() async throws {
+        guard let currentUser = currentUser else { return }
+        
+        // Get all equipment IDs for this producer
+        let equipmentIds = producerEquipment.compactMap { $0.equipmentID.uuidString }
+        print("fetchBookings: Equipment IDs: \(equipmentIds)") // Added print statement
+        
+        if !equipmentIds.isEmpty {
+            let response = try await supabase.database
+                .from("bookings")
+                .select()
+                // Corrected column name here
+                .in("equipmentID", values: equipmentIds) 
+                .execute()
+            
+            do {
+                let bookings = try JSONDecoder().decode([Booking].self, from: response.data)
+                print("fetchBookings: Fetched \(bookings.count) bookings")
+                DispatchQueue.main.async {
+                    self.producerBookings = bookings
+                }
+            } catch {
+                print("fetchBookings: Error decoding bookings: \(error)")
+                if let responseDataString = String(data: response.data, encoding: .utf8) {
+                    print("fetchBookings: Raw response data on error: \(responseDataString)")
+                }
+                DispatchQueue.main.async {
+                    self.producerBookings = [] 
+                }
+            }
+            
+        } else {
+            print("fetchBookings: No equipment IDs found, so no bookings will be fetched.")
+            DispatchQueue.main.async {
+                self.producerBookings = []
+            }
+        }
+    }
+
+
+
+    func acceptBooking(_ booking: Booking) async throws {
+        try await supabase.database
+            .from("bookings")
+            .update(["status": "accepted"])
+            .eq("id", value: booking.id.uuidString)
+            .execute()
+        
+        // Update local state
+        try await fetchBookings()
+    }
+
+    func deleteBooking(_ booking: Booking) async throws {
+        try await supabase.database
+            .from("bookings")
+            .delete()
+            .eq("id", value: booking.id.uuidString)
+            .execute()
+        
+        // Update local state
+        DispatchQueue.main.async {
+            self.producerBookings.removeAll { $0.id == booking.id }
+        }
     }
 }

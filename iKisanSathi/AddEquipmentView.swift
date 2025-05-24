@@ -242,7 +242,7 @@ struct AddEquipmentView: View {
                     description: description,
                     isRecommended: isRecommended,
                     providerName: currentUser.email,
-                    preBookingStatus: "")
+                    preBookingStatus: nil)
                 
                 try await dataController.addEquipment(equipment)
                 
