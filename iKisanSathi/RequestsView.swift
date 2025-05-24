@@ -277,8 +277,11 @@ struct BookingRow: View {
     let equipment: DataController.Equipment?
     @EnvironmentObject var dataController: DataController
     @State private var isLoading = false
+    @State private var isPressed = false
     @State private var showError = false
     @State private var errorMessage = ""
+    @State private var showingEditSheet = false
+
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -365,7 +368,7 @@ struct BookingRow: View {
                         .foregroundColor(.white)
                         .cornerRadius(10)
                     }
-                    .disabled(isLoading)
+                    
                     
                     Button(action: {
                         Task {
@@ -382,7 +385,7 @@ struct BookingRow: View {
                         .foregroundColor(.white)
                         .cornerRadius(10)
                     }
-                    .disabled(isLoading)
+                    
                 }
                 .font(.subheadline.bold())
             }
@@ -391,12 +394,31 @@ struct BookingRow: View {
         .background(Color(.systemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 2)
+        .overlay(Group {
+            if isLoading {
+                Color.black.opacity(0.3)
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+            }
+        })
+        .alert("Error", isPresented: $showError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(errorMessage)
+        }
+        .scaleEffect(isPressed ? 0.98 : 1.0)
+        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isPressed)
+        .sheet(isPresented: $showingEditSheet) {
+            if let equipment = equipment {
+                EditEquipmentView(equipment: equipment)
+            }
+        }
     }
     
     private func handleAcceptBooking() async {
         isLoading = true
         do {
-            try await dataController.acceptBooking(booking)
+            try await dataController.acceptBookingTapped(booking)
             isLoading = false
         } catch {
             isLoading = false

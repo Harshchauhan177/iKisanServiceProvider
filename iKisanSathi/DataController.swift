@@ -588,6 +588,7 @@ class DataController: ObservableObject {
         try await fetchServiceRequests()
     }
     
+    
     enum ServiceStatus: String, Codable {
         case pending = "pending"
         case inProgress = "inProgress"
@@ -1092,14 +1093,65 @@ class DataController: ObservableObject {
             }
         }
     }
-
-
+    func acceptBookingTapped(_ booking: Booking) async throws {
+        print("🔄 Accepting request with ID: \(booking.id)")
+        let equipment = equipmentDetails[booking.equipmentId ?? UUID()]
+        let amount = (equipment?.pricePerAcre ?? 0.0) * booking.fieldArea
+        print("💰 Calculated amount: \(amount) based on area: \(booking.fieldArea)")
+        
+        // Create a new service request
+        let serviceRequest = ServiceRequest(
+            id: UUID(),  // Generate new UUID
+            equipmentname: booking.equipmentId ?? UUID(),
+            farmerid: booking.userId ?? UUID(),
+            date: "\(booking.bookingDate)",
+            status: .inProgress,  // Set status as inProgress when accepting
+            type: booking.bookingType == .prebooking ? .individual : .coequip,
+            area: booking.fieldArea,
+            timeslot: booking.timeSlot,
+            timeperiod:"",
+            location: booking.address ?? "",
+            amount: amount,
+            joineduser: []
+        )
+        
+        print("📝 Creating service request with data: \(serviceRequest)")
+        
+        // Insert into servicerequests table
+        try await supabase.database
+            .from("servicerequests")
+            .insert(serviceRequest)
+            .execute()
+        
+        print("✅ Successfully inserted service request")
+        
+        print("🗑️ Deleting original request")
+        // Delete from requests table
+        try await deleteBookings(booking)
+        
+        print("🔄 Refreshing service requests list")
+        // Refresh service requests
+        try await fetchServiceRequests()
+    }
+    func deleteBookings(_ booking: Booking) async throws {
+        // Delete the request from Supabase
+        try await supabase.database
+            .from("bookings")
+            .delete()
+            .eq("bookingID", value: booking.id)
+            .execute()
+        
+        // Update local state
+        DispatchQueue.main.async {
+            self.producerRequests.removeAll { $0.id == booking.id }
+        }
+    }
 
     func acceptBooking(_ booking: Booking) async throws {
         try await supabase.database
             .from("bookings")
-            .update(["status": "accepted"])
-            .eq("id", value: booking.id.uuidString)
+            .update(["status": "Confirmed"])
+            .eq("bookingID", value: booking.id.uuidString)
             .execute()
         
         // Update local state
@@ -1110,7 +1162,7 @@ class DataController: ObservableObject {
         try await supabase.database
             .from("bookings")
             .delete()
-            .eq("id", value: booking.id.uuidString)
+            .eq("bookingID", value: booking.id)
             .execute()
         
         // Update local state
