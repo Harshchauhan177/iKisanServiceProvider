@@ -566,7 +566,7 @@ class DataController: ObservableObject {
             timeperiod: request.timePeriod ?? "",
             location: request.location,
             amount: amount,
-            joineduser: []
+            joineduser: request.joinedFarmers
         )
         
         print("📝 Creating service request with data: \(serviceRequest)")

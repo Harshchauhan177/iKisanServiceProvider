@@ -184,77 +184,218 @@ struct HomeView: View {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 12) {
                                 ForEach(Array(dataController.equipmentDetails.values.prefix(5)), id: \.equipmentID) { equipment in
-                                    VStack(alignment: .leading, spacing: 0) {
-                                        ZStack(alignment: .topTrailing) {
-                                            if let url = URL(string: equipment.equipmentImage) {
-                                                WebImage(url: url)
-                                                    .resizable()
-                                                    .scaledToFill()
-                                                    .frame(width: 180, height: 180)
-                                                    .clipped()
-                                                    .clipShape(
-                                                        RoundedCorner(radius: 12, corners: [.topLeft, .topRight])
-                                                    )
-                                            } else {
-                                                Color(.systemGray5)
-                                                    .frame(width: 180, height: 180)
-                                                    .clipShape(
-                                                        RoundedCorner(radius: 12, corners: [.topLeft, .topRight])
-                                                    )
-                                                    .overlay(
-                                                        Image(systemName: "photo")
-                                                            .font(.system(size: 30))
-                                                            .foregroundColor(.gray)
-                                                    )
+                                    NavigationLink(destination: EditEquipmentView(equipment: equipment)) {
+                                        VStack(alignment: .leading, spacing: 0) {
+                                            ZStack(alignment: .topTrailing) {
+                                                if let url = URL(string: equipment.equipmentImage) {
+                                                    WebImage(url: url)
+                                                        .resizable()
+                                                        .scaledToFill()
+                                                        .frame(width: 180, height: 180)
+                                                        .clipped()
+                                                        .clipShape(
+                                                            RoundedCorner(radius: 12, corners: [.topLeft, .topRight])
+                                                        )
+                                                } else {
+                                                    Color(.systemGray5)
+                                                        .frame(width: 180, height: 180)
+                                                        .clipShape(
+                                                            RoundedCorner(radius: 12, corners: [.topLeft, .topRight])
+                                                        )
+                                                        .overlay(
+                                                            Image(systemName: "photo")
+                                                                .font(.system(size: 30))
+                                                                .foregroundColor(.gray)
+                                                        )
+                                                }
                                             }
-                                        }
-                                        
-                                        VStack(alignment: .leading, spacing: 8) {
-                                            Text(equipment.name)
-                                                .font(.system(size: 17, weight: .semibold))
-                                                .foregroundColor(.primary)
-                                                .lineLimit(1)
                                             
-                                            // Pricing row
-                                            HStack {
-                                                // Per Hour
-                                                VStack(alignment: .leading) {
-                                                    Text("Per Hour")
-                                                        .font(.system(size: 13))
-                                                        .foregroundColor(.secondary)
-                                                    Text("₹\(String(format: "%.0f", equipment.pricePerHour))")
-                                                        .font(.system(size: 15, weight: .medium))
-                                                        .foregroundColor(.primary)
-                                                }
-                                                
-                                                Spacer()
-                                                
-                                                // Per Acre
-                                                VStack(alignment: .leading) {
-                                                    Text("Per Acre")
-                                                        .font(.system(size: 13))
-                                                        .foregroundColor(.secondary)
-                                                    Text("₹\(String(format: "%.0f", equipment.pricePerAcre))")
-                                                        .font(.system(size: 15, weight: .medium))
-                                                        .foregroundColor(.primary)
-                                                }
-                                                
+                                            VStack(alignment: .leading, spacing: 8) {
+                                                Text(equipment.name)
+                                                    .font(.system(size: 17, weight: .semibold))
+                                                    .foregroundColor(.primary)
+                                                    .lineLimit(1)
+                                                // Pricing row
+                                                HStack {
+                                                    // Per Hour
+                                                    VStack(alignment: .leading) {
+                                                        Text("Per Hour")
+                                                            .font(.system(size: 13))
+                                                            .foregroundColor(.secondary)
+                                                        Text("₹\(String(format: "%.0f", equipment.pricePerHour))")
+                                                            .font(.system(size: 15, weight: .medium))
+                                                            .foregroundColor(.primary)
+                                                    }
+                                                    
+                                                    Spacer()
+                                                    
+                                                    // Per Acre
+                                                    VStack(alignment: .leading) {
+                                                        Text("Per Acre")
+                                                            .font(.system(size: 13))
+                                                            .foregroundColor(.secondary)
+                                                        Text("₹\(String(format: "%.0f", equipment.pricePerAcre))")
+                                                            .font(.system(size: 15, weight: .medium))
+                                                            .foregroundColor(.primary)
+                                                    }
+                                                    
 //                                                Spacer()
+                                                }
                                             }
+                                            .padding(.horizontal, 12)
+                                            .padding(.vertical, 12)
                                         }
-                                        .padding(.horizontal, 12)
-                                        .padding(.vertical, 12)
+                                        .frame(width: 180)
+                                        .background(Color(.systemBackground))
+                                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                                        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
                                     }
-                                    .frame(width: 180)
-                                    .background(Color(.systemBackground))
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                                    .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
                                 }
                             }
                             .padding(.horizontal)
                             .padding(.bottom, 4)
                         }
                     }
+                    // Top Equipment section
+                    
+                    // Active Requests Section
+                    VStack(alignment: .leading, spacing: 16) {
+                        HStack {
+                            Text("Today's Active Requests")
+                                .font(.title2)
+                                .fontWeight(.semibold)
+                            Spacer()
+                            Button("See all") {
+                                isServiceRequestsActive = true
+                            }
+                            .font(.body)
+                            .foregroundColor(.blue)
+                        }
+                        .padding(.horizontal)
+                        
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 12) {
+                                let sortedRequests = dataController.serviceRequests
+                                    .filter { request in
+                                        // Filter for today's requests
+                                        let formatter = DateFormatter()
+                                        formatter.dateFormat = "yyyy-MM-dd"
+                                        let requestDate = formatter.date(from: String(request.date.prefix(10))) ?? Date()
+                                        return Calendar.current.isDateInToday(requestDate)
+                                    }
+                                    .sorted { request1, request2 in
+                                        // Sort by time remaining
+                                        let formatter = DateFormatter()
+                                        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+                                        let date1 = formatter.date(from: request1.date) ?? Date()
+                                        let date2 = formatter.date(from: request2.date) ?? Date()
+                                        return date1 < date2
+                                    }
+                                    .prefix(3)
+                                
+                                if sortedRequests.isEmpty {
+                                    VStack(alignment: .center, spacing: 8) {
+                                        Image(systemName: "calendar.badge.clock")
+                                            .font(.system(size: 40))
+                                            .foregroundColor(.gray)
+                                        Text("No active requests for today")
+                                            .font(.headline)
+                                            .foregroundColor(.gray)
+                                        Text("Total requests: \(dataController.serviceRequests.count)")
+                                            .font(.caption)
+                                            .foregroundColor(.gray)
+                                    }
+                                    .frame(width: 250)
+                                    .padding()
+                                    .background(Color(.systemBackground))
+                                    .cornerRadius(12)
+                                } else {
+                                    ForEach(Array(sortedRequests), id: \.id) { request in
+                                        NavigationLink(destination: ServiceRequestDetailView(serviceRequest: request)) {
+                                            VStack(alignment: .leading, spacing: 16) {
+                                                HStack(spacing: 12) {
+                                                    if let equipment = dataController.equipmentDetails[request.equipmentname],
+                                                       let url = URL(string: equipment.equipmentImage) {
+                                                        WebImage(url: url)
+                                                            .resizable()
+                                                            .scaledToFill()
+                                                            .frame(width: 80, height: 80)
+                                                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                                                    } else {
+                                                        RoundedRectangle(cornerRadius: 12)
+                                                            .fill(Color.gray.opacity(0.1))
+                                                            .frame(width: 80, height: 80)
+                                                            .overlay(
+                                                                Image(systemName: "photo")
+                                                                    .foregroundColor(.gray)
+                                                            )
+                                                    }
+                                                    
+                                                    VStack(alignment: .leading, spacing: 4) {
+                                                        if let equipment = dataController.equipmentDetails[request.equipmentname] {
+                                                            Text(equipment.name)
+                                                                .font(.title3)
+                                                                .fontWeight(.semibold)
+                                                                .foregroundColor(.primary)
+                                                            
+                                                            Text("Agricultural")
+                                                                .font(.subheadline)
+                                                                .foregroundColor(.secondary)
+                                                            
+                                                            Text("Capacity: \(equipment.capacity)")
+                                                                .font(.subheadline)
+                                                                .foregroundColor(.secondary)
+                                                        }
+                                                    }
+                                                }
+                                                
+                                                HStack(spacing: 16) {
+                                                    // Date
+                                                    HStack(spacing: 8) {
+                                                        Image(systemName: "calendar")
+                                                            .foregroundColor(.blue)
+                                                        let date = String(request.date.prefix(10))
+                                                        Text(date)
+                                                            .font(.subheadline)
+                                                            .foregroundColor(.primary)
+                                                    }
+                                                    
+                                                    // Time
+                                                    HStack(spacing: 8) {
+                                                        Image(systemName: "clock")
+                                                            .foregroundColor(.orange)
+                                                        Text(request.timeslot.rawValue)
+                                                            .font(.subheadline)
+                                                            .foregroundColor(.primary)
+                                                    }
+                                                }
+                                                
+                                                // Area
+                                                HStack {
+                                                    Spacer()
+                                                    Text("\(String(format: "%.1f", request.area)) acres")
+                                                        .font(.headline)
+                                                        .foregroundColor(.blue)
+                                                        .padding(.horizontal, 12)
+                                                        .padding(.vertical, 6)
+                                                        .background(Color.blue.opacity(0.1))
+                                                        .cornerRadius(8)
+                                                }
+                                            }
+                                            .padding(16)
+                                            .background(Color(.systemBackground))
+                                            .cornerRadius(16)
+                                            .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+                                        }
+                                    }
+                                }
+                            }
+                            .padding(.horizontal)
+                            .padding(.bottom, 4)
+                        }
+                    }
+                    
+                    Spacer()
                 }
                 .padding(.top, 8)
             }
@@ -302,6 +443,7 @@ struct HomeView: View {
             .task {
                 do {
                     try await dataController.fetchServiceRequests()
+                    print("Fetched \(dataController.serviceRequests.count) service requests")
                 } catch {
                     print("Error fetching service requests: \(error)")
                 }
