@@ -46,17 +46,6 @@ struct ServiceRequestDetailView: View {
                     DetailRow(icon: "ruler", text: "\(String(format: "%.1f", serviceRequest.area)) acres")
                     DetailRow(icon: "indianrupeesign.circle", text: "₹\(String(format: "%.2f", serviceRequest.amount))")
                     
-                    // Add Co-Equip Users Section if type is co-equip
-                    if serviceRequest.type == .coequip && !serviceRequest.joineduser.isEmpty {
-                        Divider()
-                        Text("Joined Users")
-                            .font(.headline)
-                            .padding(.top, 5)
-                        
-                        ForEach(serviceRequest.joineduser, id: \.self) { userID in
-                            DetailRow(icon: "person", text: userID.uuidString)
-                        }
-                    }
                 }
                 .padding()
                 .background(Color(.systemBackground))

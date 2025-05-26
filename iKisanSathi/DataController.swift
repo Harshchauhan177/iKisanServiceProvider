@@ -565,8 +565,7 @@ class DataController: ObservableObject {
             timeslot: request.timeSlot,
             timeperiod: request.timePeriod ?? "",
             location: request.location,
-            amount: amount,
-            joineduser: request.joinedFarmers
+            amount: amount
         )
         
         print("📝 Creating service request with data: \(serviceRequest)")
@@ -645,9 +644,9 @@ class DataController: ObservableObject {
         let timeperiod: String
         let location: String
         let amount: Double
-        let joineduser: [UUID]
         
-        init(id: UUID, equipmentname: UUID, farmerid: UUID, date: String, status: ServiceStatus, type: ServiceType, area: Double, timeslot: TimeSlot, timeperiod: String, location: String, amount: Double, joineduser: [UUID]) {
+        
+        init(id: UUID, equipmentname: UUID, farmerid: UUID, date: String, status: ServiceStatus, type: ServiceType, area: Double, timeslot: TimeSlot, timeperiod: String, location: String, amount: Double) {
             self.id = id
             self.equipmentname = equipmentname
             self.farmerid = farmerid
@@ -659,7 +658,7 @@ class DataController: ObservableObject {
             self.timeperiod = timeperiod
             self.location = location
             self.amount = amount
-            self.joineduser = joineduser
+            
         }
         
         func encode(to encoder: Encoder) throws {
@@ -675,7 +674,7 @@ class DataController: ObservableObject {
             try container.encode(timeperiod, forKey: .timeperiod)
             try container.encode(location, forKey: .location)
             try container.encode(amount, forKey: .amount)
-            try container.encode(joineduser, forKey: .joineduser)
+            
         }
         
         init(from decoder: Decoder) throws {
@@ -717,7 +716,7 @@ class DataController: ObservableObject {
             timeperiod = try container.decode(String.self, forKey: .timeperiod)
             location = try container.decode(String.self, forKey: .location)
             amount = try container.decode(Double.self, forKey: .amount)
-            joineduser = try container.decode([UUID].self, forKey: .joineduser)
+            
         }
         
         private enum CodingKeys: String, CodingKey {
@@ -732,7 +731,7 @@ class DataController: ObservableObject {
             case timeperiod
             case location
             case amount
-            case joineduser
+            
         }
     }
     
@@ -1111,8 +1110,7 @@ class DataController: ObservableObject {
             timeslot: booking.timeSlot,
             timeperiod:"",
             location: booking.address ?? "",
-            amount: amount,
-            joineduser: []
+            amount: amount
         )
         
         print("📝 Creating service request with data: \(serviceRequest)")

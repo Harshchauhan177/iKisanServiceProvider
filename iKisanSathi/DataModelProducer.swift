@@ -196,8 +196,7 @@ struct Request: Codable, Identifiable {
     let timePeriod: String?
     let location: String
     let typeOfRequest: RequestType
-    let selectedUsersIds:[UUID]
-    let joinedFarmers:[UUID]
+    
     
     var date: Date? {
         let formatter = DateFormatter()
@@ -217,8 +216,7 @@ struct Request: Codable, Identifiable {
         case timePeriod
         case location
         case typeOfRequest
-        case selectedUsersIds
-        case joinedFarmers
+       
     }
     }
 
@@ -248,7 +246,6 @@ struct ServiceRequests: Codable {
     var timeslot: TimeSlot
     var timeperiod: String
     var location: String
-    var joineduser: [UUID]
     
     var dateObject: Date? {
         let formatter = DateFormatter()

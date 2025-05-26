@@ -267,10 +267,6 @@ struct RequestRow: View {
     }
 }
 
-//#Preview {
-//    RequestsView()
-//        .environmentObject(DataController())
-//}
 
 struct BookingRow: View {
     let booking: Booking
