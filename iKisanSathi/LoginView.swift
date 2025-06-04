@@ -1,4 +1,5 @@
 import SwiftUI
+import AuthenticationServices
 
 struct LoginView: View {
     @EnvironmentObject var dataController: DataController
@@ -8,6 +9,7 @@ struct LoginView: View {
     @State private var showingAlert = false
     @State private var alertMessage = ""
     @State private var isLoading = false
+    @StateObject private var appleVM = SignInWithAppleViewModel()
     
     var body: some View {
         VStack {
@@ -52,6 +54,19 @@ struct LoginView: View {
             } message: {
                 Text(alertMessage)
             }
+            
+           
+
+
+            SignInWithAppleButton(.signIn, onRequest: { _ in }, onCompletion: { _ in
+                appleVM.signIn()
+            })
+            .signInWithAppleButtonStyle(.black)
+            .frame(height: 50)
+            .padding()
+
+            
+            
         }
     }
     
