@@ -12,61 +12,80 @@ struct LoginView: View {
     @StateObject private var appleVM = SignInWithAppleViewModel()
     
     var body: some View {
-        VStack {
-            VStack(spacing: 20) {
-                Text("Producer Login")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                    .padding(.bottom, 30)
-                
-                TextField("Email", text: $email)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .autocapitalization(.none)
-                    .keyboardType(.emailAddress)
-                
-                SecureField("Password", text: $password)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                
-                Button(action: login) {
-                    Text("Login")
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.blue)
-                        .cornerRadius(10)
+        Group {
+            if appleVM.isAuthenticated {
+                MainTabView()
+            } else {
+                VStack {
+                    VStack(spacing: 20) {
+                        Text("Producer Login")
+                            .font(.largeTitle)
+                            .fontWeight(.bold)
+                            .padding(.bottom, 30)
+                        
+                        TextField("Email", text: $email)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                            .autocapitalization(.none)
+                            .keyboardType(.emailAddress)
+                        
+                        SecureField("Password", text: $password)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                        
+                        Button(action: login) {
+                            Text("Login")
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Color.blue)
+                                .cornerRadius(10)
+                        }
+                        
+                        Button(action: { showingSignUp = true }) {
+                            Text("Don't have an account? Sign Up")
+                                .foregroundColor(.blue)
+                        }
+                    }
+                    .padding()
+                    
+                    NavigationLink(isActive: $showingSignUp) {
+                        SignUpView()
+                    } label: {
+                        EmptyView()
+                    }
+                    
+                    .padding()
+                    .loading(isLoading)
+                    .alert("Error", isPresented: $showingAlert) {
+                        Button("OK", role: .cancel) { }
+                    } message: {
+                        Text(alertMessage)
+                    }
+                    
+                    SignInWithAppleButton(.signIn, onRequest: { request in
+                        request.requestedScopes = [.fullName, .email]
+                    }, onCompletion: { result in
+                        switch result {
+                        case .success(let authResults):
+                            if let appleIDCredential = authResults.credential as? ASAuthorizationAppleIDCredential {
+                                Task {
+                                    await appleVM.handleAppleSignIn(credential: appleIDCredential)
+                                }
+                            }
+                        case .failure(let error):
+                            appleVM.errorMessage = error.localizedDescription
+                        }
+                    })
+                    .signInWithAppleButtonStyle(.black)
+                    .frame(height: 50)
+                    .padding()
                 }
-                
-                Button(action: { showingSignUp = true }) {
-                    Text("Don't have an account? Sign Up")
-                        .foregroundColor(.blue)
-                }
             }
-            .padding()
-            NavigationLink(isActive: $showingSignUp) {
-                SignUpView()
-            } label: {
-                EmptyView()
+        }
+        .onChange(of: appleVM.errorMessage) { newValue in
+            if let error = newValue {
+                alertMessage = error
+                showingAlert = true
             }
-            .padding()
-            .loading(isLoading)
-            .alert("Error", isPresented: $showingAlert) {
-                Button("OK", role: .cancel) { }
-            } message: {
-                Text(alertMessage)
-            }
-            
-           
-
-
-            SignInWithAppleButton(.signIn, onRequest: { _ in }, onCompletion: { _ in
-                appleVM.signIn()
-            })
-            .signInWithAppleButtonStyle(.black)
-            .frame(height: 50)
-            .padding()
-
-            
-            
         }
     }
     

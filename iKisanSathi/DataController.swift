@@ -245,10 +245,13 @@ class DataController: ObservableObject {
             .from("producer")
             .select()
             .eq("id", value: currentUser.id.uuidString)
-            .single()
             .execute()
         
-        let producer = try JSONDecoder().decode(Producer.self, from: response.data)
+        let producers = try JSONDecoder().decode([Producer].self, from: response.data)
+        guard let producer = producers.first else {
+            // Handle no producer found
+            throw NSError(domain: "DataController", code: 404, userInfo: [NSLocalizedDescriptionKey: "No producer found for this user."])
+        }
         
         DispatchQueue.main.async {
             self.currentProducer = producer
@@ -356,10 +359,13 @@ class DataController: ObservableObject {
             .from("producer")
             .select()
             .eq("id", value: user.id.uuidString)
-            .single()
             .execute()
         
-        let producer = try JSONDecoder().decode(Producer.self, from: producerResponse.data)
+        let producers = try JSONDecoder().decode([Producer].self, from: producerResponse.data)
+        guard let producer = producers.first else {
+            // Handle no producer found
+            throw NSError(domain: "DataController", code: 404, userInfo: [NSLocalizedDescriptionKey: "No producer found for this user."])
+        }
         
         // Update UI on main thread
         DispatchQueue.main.async {
@@ -407,10 +413,13 @@ class DataController: ObservableObject {
                     .from("producer")
                     .select()
                     .eq("id", value: user.id.uuidString)
-                    .single()
                     .execute()
                 
-                let producer = try JSONDecoder().decode(Producer.self, from: producerResponse.data)
+                let producers = try JSONDecoder().decode([Producer].self, from: producerResponse.data)
+                guard let producer = producers.first else {
+                    // Handle no producer found
+                    throw NSError(domain: "DataController", code: 404, userInfo: [NSLocalizedDescriptionKey: "No producer found for this user."])
+                }
                 
                 // Update UI on main thread
                 DispatchQueue.main.async {

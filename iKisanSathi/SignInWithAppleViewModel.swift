@@ -118,6 +118,86 @@ class SignInWithAppleViewModel: NSObject, ObservableObject {
         controller.performRequests()
     }
 
+    func handleAppleSignIn(credential: ASAuthorizationAppleIDCredential) async {
+        guard let identityToken = credential.identityToken,
+              let tokenString = String(data: identityToken, encoding: .utf8) else {
+            await MainActor.run {
+                self.errorMessage = "Failed to get Apple credentials"
+            }
+            return
+        }
+
+        let rawName = [credential.fullName?.givenName, credential.fullName?.familyName].compactMap { $0 }.joined(separator: " ")
+        let finalName = rawName.isEmpty ? "iKisan Producer" : rawName
+        
+        print("📱 Apple Sign In - Constructed Name:", finalName)
+        
+        // Email might be nil after first sign in
+        let rawEmail = credential.email ?? ""
+        print("📱 Apple Sign In - Raw Apple Email:", rawEmail)
+        print("📱 Apple Sign In - User ID:", credential.user)
+
+        do {
+            await MainActor.run { self.isLoading = true }
+            
+            print("🔄 Attempting Supabase Auth sign in...")
+            let session = try await client.auth.signInWithIdToken(
+                credentials: .init(
+                    provider: .apple,
+                    idToken: tokenString,
+                    nonce: currentNonce
+                )
+            )
+
+            print("✅ Supabase Auth Success:")
+            print("   - User ID: \(session.user.id)")
+            print("   - Email: \(session.user.email ?? "No email")")
+
+            // Save the session
+            await saveSession(session)
+
+            // Always use email from Supabase session if Apple didn't provide it
+            let finalEmail = rawEmail.isEmpty ? (session.user.email ?? "") : rawEmail
+
+            if !finalEmail.isEmpty {
+                do {
+                    print("🔄 Attempting to upsert into Producer table...")
+                    try await insertIntoProducerTable(
+                        id: session.user.id,
+                        name: finalName,
+                        email: finalEmail
+                    )
+                    print("✅ Successfully upserted into Producer table")
+                    
+                    // Set authentication state
+                    await MainActor.run {
+                        self.isAuthenticated = true
+                        self.navigateToHome = true
+                        self.errorMessage = nil
+                    }
+                } catch let error as PostgrestError {
+                    print("⚠️ Postgrest Error:", error.message)
+                    if !error.message.contains("duplicate key value") {
+                        await MainActor.run {
+                            self.errorMessage = "Failed to save producer data: \(error.message)"
+                        }
+                    }
+                }
+            }
+            
+        } catch {
+            print("❌ Sign-in error: \(error.localizedDescription)")
+            await MainActor.run {
+                self.errorMessage = "Sign-in failed: \(error.localizedDescription)"
+                self.isAuthenticated = false
+                self.navigateToHome = false
+            }
+            await clearSession()
+        }
+        
+        await MainActor.run { self.isLoading = false }
+    }
+
     private func insertIntoProducerTable(id: UUID, name: String, email: String) async throws {
         print("🔄 Creating ProducerData with:")
         print("   - ID: \(id)")
@@ -239,6 +319,13 @@ extension SignInWithAppleViewModel: ASAuthorizationControllerDelegate, ASAuthori
                             email: finalEmail
                         )
                         print("✅ Successfully upserted into Producer table")
+                        
+                        // Set authentication state
+                        await MainActor.run {
+                            self.isAuthenticated = true
+                            self.navigateToHome = true
+                            self.errorMessage = nil
+                        }
                     } catch let error as PostgrestError {
                         print("⚠️ Postgrest Error:", error.message)
                         if !error.message.contains("duplicate key value") {
@@ -253,6 +340,8 @@ extension SignInWithAppleViewModel: ASAuthorizationControllerDelegate, ASAuthori
                 print("❌ Sign-in error: \(error.localizedDescription)")
                 await MainActor.run {
                     self.errorMessage = "Sign-in failed: \(error.localizedDescription)"
+                    self.isAuthenticated = false
+                    self.navigateToHome = false
                 }
                 await clearSession()
             }
