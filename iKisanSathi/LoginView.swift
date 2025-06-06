@@ -69,6 +69,9 @@ struct LoginView: View {
                             if let appleIDCredential = authResults.credential as? ASAuthorizationAppleIDCredential {
                                 Task {
                                     await appleVM.handleAppleSignIn(credential: appleIDCredential)
+                                    if let session = appleVM.lastSupabaseSession {
+                                        await dataController.setSessionFromApple(session: session)
+                                    }
                                 }
                             }
                         case .failure(let error):

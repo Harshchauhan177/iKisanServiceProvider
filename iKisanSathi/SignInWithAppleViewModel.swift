@@ -16,6 +16,7 @@ class SignInWithAppleViewModel: NSObject, ObservableObject {
     @Published var isAuthenticated = false
     @Published var navigateToHome = false
     @Published var errorMessage: String?
+    @Published var lastSupabaseSession: Session?
     
     private var currentNonce: String?
     private var client: SupabaseClient!
@@ -148,6 +149,7 @@ class SignInWithAppleViewModel: NSObject, ObservableObject {
                     nonce: currentNonce
                 )
             )
+            self.lastSupabaseSession = session
 
             print("✅ Supabase Auth Success:")
             print("   - User ID: \(session.user.id)")
@@ -299,6 +301,7 @@ extension SignInWithAppleViewModel: ASAuthorizationControllerDelegate, ASAuthori
                         nonce: currentNonce
                     )
                 )
+                self.lastSupabaseSession = session
 
                 print("✅ Supabase Auth Success:")
                 print("   - User ID: \(session.user.id)")

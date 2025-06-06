@@ -1177,4 +1177,25 @@ class DataController: ObservableObject {
             self.producerBookings.removeAll { $0.id == booking.id }
         }
     }
+
+    func setSessionFromApple(session: Session) async {
+        // Store tokens
+        UserDefaults.standard.set(session.accessToken, forKey: accessTokenKey)
+        UserDefaults.standard.set(session.refreshToken, forKey: refreshTokenKey)
+        // Store user data
+        let user = User(
+            id: session.user.id,
+            email: session.user.email ?? "",
+            createdAt: session.user.createdAt
+        )
+        if let userData = try? JSONEncoder().encode(user) {
+            UserDefaults.standard.set(userData, forKey: userKey)
+        }
+        await MainActor.run {
+            self.currentUser = user
+            self.isAuthenticated = true
+        }
+        // Fetch producer details
+        try? await fetchProducerDetails()
+    }
 }
