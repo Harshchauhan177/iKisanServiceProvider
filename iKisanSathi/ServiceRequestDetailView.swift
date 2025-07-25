@@ -9,35 +9,44 @@ struct ServiceRequestDetailView: View {
     var body: some View {
         VStack(spacing: 24) {
             Spacer().frame(height: 1) // Add vertical space at the top
-            // Equipment Card
-            HStack(spacing: 16) {
-                AsyncImage(url: URL(string: dataController.equipmentDetails[serviceRequest.equipmentname]?.equipmentImage ?? "")) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    Color.gray.opacity(0.3)
+            // Equipment Card with StatusBadge vertically centered on the right
+            ZStack {
+                HStack(spacing: 16) {
+                    AsyncImage(url: URL(string: dataController.equipmentDetails[serviceRequest.equipmentname]?.equipmentImage ?? "")) { image in
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        Color.gray.opacity(0.3)
+                    }
+                    .frame(width: 70, height: 70)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(dataController.equipmentDetails[serviceRequest.equipmentname]?.name ?? "")
+                            .font(.title3)
+                            .fontWeight(.bold)
+                        Text(dataController.equipmentDetails[serviceRequest.equipmentname]?.type ?? "")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        Text("Capacity: \(dataController.equipmentDetails[serviceRequest.equipmentname]?.capacity ?? "")")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
                 }
-                .frame(width: 70, height: 70)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(dataController.equipmentDetails[serviceRequest.equipmentname]?.name ?? "")
-                        .font(.title3)
-                        .fontWeight(.bold)
-                    Text(dataController.equipmentDetails[serviceRequest.equipmentname]?.type ?? "")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                    Text("Capacity: \(dataController.equipmentDetails[serviceRequest.equipmentname]?.capacity ?? "")")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+                .padding()
+                .background(Color.white)
+                .cornerRadius(16)
+                .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
+                .padding(.horizontal)
+                // Centered StatusBadge overlay
+                HStack {
+                    Spacer()
+                    StatusBadge(status: serviceRequest.status)
                 }
-                Spacer()
+                .padding(.trailing, 32)
             }
-            .padding()
-            .background(Color.white)
-            .cornerRadius(16)
-            .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
-            .padding(.horizontal)
+            .frame(height: 100) // Ensure enough height for vertical centering
 
             // Details Card
             VStack(alignment: .leading, spacing: 16) {
@@ -52,13 +61,6 @@ struct ServiceRequestDetailView: View {
             .cornerRadius(16)
             .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
             .padding(.horizontal)
-
-            // Status Badge
-            HStack {
-                Spacer()
-                StatusBadge(status: serviceRequest.status)
-                Spacer()
-            }
 
             // Complete Service Button
             Button(action: {
@@ -78,7 +80,7 @@ struct ServiceRequestDetailView: View {
             Spacer()
         }
         .background(Color(.systemGroupedBackground).ignoresSafeArea())
-//        .navigationTitle("In Progress Requests")
+        .navigationTitle("In Progress Requests")
         .navigationBarTitleDisplayMode(.inline)
         .alert("Complete Service Request", isPresented: $isConfirming) {
             Button("Cancel", role: .cancel) { }

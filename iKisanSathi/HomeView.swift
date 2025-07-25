@@ -17,22 +17,22 @@ struct FeatureCard: View {
                             Text(title)
                                 .font(.title3)
                                 .fontWeight(.semibold)
-                                .foregroundColor(.white)
+                                .foregroundColor(.primary)
                             
                             Text(subtitle)
                                 .font(.subheadline)
-                                .foregroundColor(.white.opacity(0.9))
+                                .foregroundColor(.secondary)
                         }
                         Spacer()
                         Image(systemName: "plus.circle.fill")
                             .font(.title2)
-                            .foregroundColor(.white)
+                            .foregroundColor(color)
                     }
                     .padding()
                     .frame(maxWidth: .infinity)
                     .frame(height: 100)
                     .background(
-                        LinearGradient(gradient: Gradient(colors: [color, color.opacity(0.8)]), 
+                        LinearGradient(gradient: Gradient(colors: [color.opacity(0.15), color.opacity(0.08)]), 
                                      startPoint: .topLeading, 
                                      endPoint: .bottomTrailing)
                     )
@@ -464,7 +464,7 @@ struct QuickAccessButton: View {
             VStack(spacing: 10) {
                 ZStack {
                     Circle()
-                        .fill(color.opacity(0.15))
+                        .fill(Color(.secondarySystemBackground))
                         .frame(width: 56, height: 56)
                     Image(systemName: iconName)
                         .font(.system(size: 24))
@@ -475,7 +475,7 @@ struct QuickAccessButton: View {
                     .foregroundColor(.primary)
             }
             .frame(maxWidth: .infinity, minHeight: 100)
-            .background(Color.white)
+            .background(Color(.systemBackground))
             .cornerRadius(16)
             .shadow(color: Color.black.opacity(0.03), radius: 2, x: 0, y: 1)
         }
