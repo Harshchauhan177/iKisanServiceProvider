@@ -1,4 +1,5 @@
 import SwiftUI
+import SDWebImageSwiftUI
 
 struct ServiceRequestsView: View {
     @EnvironmentObject var dataController: DataController
@@ -28,17 +29,17 @@ struct ServiceRequestsView: View {
                         ForEach(inProgressRequests, id: \.id) { request in
                             NavigationLink(destination: ServiceRequestDetailView(serviceRequest: request)) {
                                 ServiceRequestRow(request: request, equipment: dataController.equipmentDetails[request.equipmentname])
-                                    .padding(.horizontal)
                                     .padding(.vertical, 8)
                             }
                             .buttonStyle(PlainButtonStyle())
                         }
-                        .padding(.horizontal)
                     }
+                    .padding(.horizontal) // Move horizontal padding here
                     .padding(.vertical)
                 }
             }
         }
+        .background(Color(.systemGray6).ignoresSafeArea())
         .navigationTitle("In Progress Requests")
         .navigationBarTitleDisplayMode(.inline)
         .task {
@@ -57,75 +58,74 @@ struct ServiceRequestRow: View {
     @Environment(\.colorScheme) var colorScheme
     let request: DataController.ServiceRequest
     let equipment: DataController.Equipment?
+    @State private var isLoading = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            if let equipment = equipment {
-                HStack(alignment: .top, spacing: 12) {
-                    // Equipment image container
-                    AsyncImage(url: URL(string: equipment.equipmentImage)) { image in
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } placeholder: {
-                        Color(.systemGray5)
-                            .overlay(
-                                Image(systemName: "photo")
-                                    .font(.system(size: 24))
-                                    .foregroundColor(.gray)
-                            )
-                    }
-                    .frame(width: 90, height: 90)
-                    .cornerRadius(10)
-                    .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+            // Header with Equipment Image and Details
+            HStack(spacing: 12) {
+                if let equipment = equipment {
+                    WebImage(url: URL(string: equipment.equipmentImage))
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 80, height: 80)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(Color(.systemGray5), lineWidth: 1)
+                        )
                     
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(equipment.name)
-                            .font(.system(.headline, design: .rounded))
-                            .foregroundColor(.primary)
-                        
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text(equipment.name)
+                                .font(.headline)
+                                .foregroundColor(.primary)
+                            Spacer()
+                            // Time Slot
+                            HStack(spacing: 6) {
+                                Image(systemName: "clock")
+                                    .foregroundColor(.orange)
+                                Text(request.timeperiod)
+                                    .font(.subheadline)
+                                    .foregroundColor(.primary)
+                            }
+                        }
                         Text(equipment.type)
                             .font(.subheadline)
                             .foregroundColor(.secondary)
-                        
                         Text("Capacity: \(equipment.capacity)")
-                            .font(.footnote)
+                            .font(.caption)
                             .foregroundColor(.secondary)
-                            .padding(.top, 2)
                     }
-                    
                     Spacer()
                 }
-                
-                Divider()
-                    .padding(.vertical, 4)
             }
-            
-            VStack(alignment: .leading, spacing: 12) {
-                infoRow(icon: "calendar") {
-                    Text(request.date)
-                }
-                
-                infoRow(icon: "mappin.and.ellipse") {
-                    Text(request.location)
-                }
-                
-                infoRow(icon: "clock") {
-                    HStack {
-                        Text(request.timeslot.rawValue)
-                        Text("•")
-                        Text(request.timeperiod)
+            // Request Details
+            VStack(spacing: 12) {
+                // Date and Area
+                HStack {
+                    // Date
+                    HStack(spacing: 6) {
+                        Image(systemName: "calendar")
+                            .foregroundColor(.blue)
+                        Text(request.date)
+                            .font(.subheadline)
+                            .foregroundColor(.primary)
+                    }
+                    Spacer()
+                    // Area (if available)
+                    if request.area > 0 {
+                        Text("\(String(format: "%.1f", request.area)) acres")
+                            .font(.subheadline)
+                            .foregroundColor(.blue)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.blue.opacity(0.1))
+                            .cornerRadius(8)
                     }
                 }
-                
-//                infoRow(icon: "ruler") {
-//                    Text("\(String(format: "%.1f", request.area)) acres")
-//                }
-                
-                infoRow(icon: "indianrupeesign.circle") {
-                    Text("₹\(String(format: "%.2f", request.amount))")
-                }
-                
+                Divider()
+                // Status and Type
                 HStack {
                     StatusBadge(status: request.status)
                     Spacer()
@@ -134,14 +134,19 @@ struct ServiceRequestRow: View {
                         .foregroundColor(.secondary)
                 }
             }
-            .padding(.horizontal, 4)
         }
         .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color(.systemBackground))
-                .shadow(color: Color(.systemGray4).opacity(0.3), radius: 8, x: 0, y: 2)
-        )
+        .frame(maxWidth: .infinity, alignment: .leading) // Make card fill width
+        .background(Color(.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 2)
+        .overlay(Group {
+            if isLoading {
+                Color.black.opacity(0.3)
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+            }
+        })
     }
     
     private func infoRow<Content: View>(
