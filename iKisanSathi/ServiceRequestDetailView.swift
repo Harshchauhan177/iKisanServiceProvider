@@ -7,74 +7,78 @@ struct ServiceRequestDetailView: View {
     @State private var isConfirming = false
     
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                // Equipment Image and Details
-                HStack(alignment: .top, spacing: 15) {
-                    AsyncImage(url: URL(string: dataController.equipmentDetails[serviceRequest.equipmentname]?.equipmentImage ?? "")) { image in
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } placeholder: {
-                        Color.gray.opacity(0.3)
-                    }
-                    .frame(width: 100, height: 100)
-                    .cornerRadius(10)
-                    
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(dataController.equipmentDetails[serviceRequest.equipmentname]?.name ?? "")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                        
-                        Text(dataController.equipmentDetails[serviceRequest.equipmentname]?.type ?? "")
-                            .foregroundColor(.gray)
-                        
-                        Text("Capacity: \(dataController.equipmentDetails[serviceRequest.equipmentname]?.capacity ?? "")")
-                            .foregroundColor(.gray)
-                    }
+        VStack(spacing: 24) {
+            Spacer().frame(height: 1) // Add vertical space at the top
+            // Equipment Card
+            HStack(spacing: 16) {
+                AsyncImage(url: URL(string: dataController.equipmentDetails[serviceRequest.equipmentname]?.equipmentImage ?? "")) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    Color.gray.opacity(0.3)
                 }
-                .padding()
-                .background(Color(.systemBackground))
-                .cornerRadius(12)
-                .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
-                
-                // Request Details
-                VStack(alignment: .leading, spacing: 15) {
-                    DetailRow(icon: "calendar", text: serviceRequest.date)
-                    DetailRow(icon: "mappin.and.ellipse", text: serviceRequest.location)
-                    DetailRow(icon: "clock", text: "\(serviceRequest.timeslot.rawValue) • \(serviceRequest.timeperiod)")
-                    DetailRow(icon: "ruler", text: "\(String(format: "%.1f", serviceRequest.area)) acres")
-                    DetailRow(icon: "indianrupeesign.circle", text: "₹\(String(format: "%.2f", serviceRequest.amount))")
-                    
+                .frame(width: 70, height: 70)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(dataController.equipmentDetails[serviceRequest.equipmentname]?.name ?? "")
+                        .font(.title3)
+                        .fontWeight(.bold)
+                    Text(dataController.equipmentDetails[serviceRequest.equipmentname]?.type ?? "")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    Text("Capacity: \(dataController.equipmentDetails[serviceRequest.equipmentname]?.capacity ?? "")")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
                 }
-                .padding()
-                .background(Color(.systemBackground))
-                .cornerRadius(12)
-                .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
-                
-                // Status Badge
-                HStack {
-                    Spacer()
-                    StatusBadge(status: serviceRequest.status)
-                    Spacer()
-                }
-                
-                // Confirm Button
-                Button(action: {
-                    isConfirming = true
-                }) {
-                    Text("Complete Service")
-                        .fontWeight(.semibold)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.blue)
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
-                }
-                .padding(.top)
+                Spacer()
             }
             .padding()
+            .background(Color.white)
+            .cornerRadius(16)
+            .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
+            .padding(.horizontal)
+
+            // Details Card
+            VStack(alignment: .leading, spacing: 16) {
+                DetailRow(icon: "calendar", text: serviceRequest.date)
+                DetailRow(icon: "mappin.and.ellipse", text: serviceRequest.location)
+                DetailRow(icon: "clock", text: "\(serviceRequest.timeslot.rawValue) • \(serviceRequest.timeperiod)")
+                DetailRow(icon: "ruler", text: "\(String(format: "%.1f", serviceRequest.area)) acres")
+                DetailRow(icon: "indianrupeesign.circle", text: "₹\(String(format: "%.2f", serviceRequest.amount))")
+            }
+            .padding()
+            .background(Color.white)
+            .cornerRadius(16)
+            .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
+            .padding(.horizontal)
+
+            // Status Badge
+            HStack {
+                Spacer()
+                StatusBadge(status: serviceRequest.status)
+                Spacer()
+            }
+
+            // Complete Service Button
+            Button(action: {
+                isConfirming = true
+            }) {
+                Text("Complete Service")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(14)
+            }
+            .padding(.horizontal)
+            .padding(.top, 8)
+
+            Spacer()
         }
+        .background(Color(.systemGroupedBackground).ignoresSafeArea())
+//        .navigationTitle("In Progress Requests")
         .navigationBarTitleDisplayMode(.inline)
         .alert("Complete Service Request", isPresented: $isConfirming) {
             Button("Cancel", role: .cancel) { }
