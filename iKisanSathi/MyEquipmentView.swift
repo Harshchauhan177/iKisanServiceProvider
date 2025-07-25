@@ -1,6 +1,56 @@
 import SwiftUI
 import SDWebImageSwiftUI
 
+// New view for displaying multiple equipment images
+struct EquipmentImageCarousel: View {
+    let mainImageUrl: String
+    let equipmentID: UUID
+    @EnvironmentObject var dataController: DataController
+    @State private var additionalImages: [String] = []
+    @State private var currentImageIndex = 0
+    
+    private var allImages: [String] {
+        var images = [mainImageUrl]
+        images.append(contentsOf: additionalImages)
+        return images
+    }
+    
+    var body: some View {
+        VStack {
+            if allImages.count > 1 {
+                TabView(selection: $currentImageIndex) {
+                    ForEach(Array(allImages.enumerated()), id: \.offset) { index, imageUrl in
+                        WebImage(url: URL(string: imageUrl))
+                            .resizable()
+                            .scaledToFill()
+                            .tag(index)
+                    }
+                }
+                .tabViewStyle(PageTabViewStyle(indexDisplayMode: .automatic))
+                .indexViewStyle(PageIndexViewStyle(backgroundDisplayMode: .always))
+            } else {
+                WebImage(url: URL(string: mainImageUrl))
+                    .resizable()
+                    .scaledToFill()
+            }
+        }
+        .task {
+            await loadAdditionalImages()
+        }
+    }
+    
+    private func loadAdditionalImages() async {
+        do {
+            let images = try await dataController.fetchEquipmentMoreImages(equipmentID: equipmentID)
+            await MainActor.run {
+                self.additionalImages = images
+            }
+        } catch {
+            print("Failed to load additional images: \(error)")
+        }
+    }
+}
+
 struct MyEquipmentView: View {
     @EnvironmentObject var dataController: DataController
     @State private var showingAddEquipment = false
@@ -112,28 +162,12 @@ struct EquipmentCard: View {
         VStack(alignment: .leading, spacing: 4) {
             GeometryReader { geometry in
                 ZStack(alignment: .topTrailing) {
-                    Color(.systemGray5)
-                    if let url = URL(string: equipment.equipmentImage) {
-                        WebImage(url: url)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: geometry.size.width, height: geometry.size.width)
-                            .clipped()
-                            .overlay(Group {
-                                if !equipment.equipmentImage.isEmpty {
-                                    EmptyView()
-                                } else {
-                                    Image(systemName: "photo")
-                                        .font(.system(size: 24))
-                                        .foregroundColor(.gray)
-                                }
-                            })
-                    } else {
-                        Image(systemName: "photo")
-                            .font(.system(size: 24))
-                            .foregroundColor(.gray)
-                            .frame(width: geometry.size.width, height: geometry.size.width)
-                    }
+                    EquipmentImageCarousel(
+                        mainImageUrl: equipment.equipmentImage,
+                        equipmentID: equipment.equipmentID
+                    )
+                    .frame(width: geometry.size.width, height: geometry.size.width)
+                    .clipped()
                     
                     Button {
                         showingActionSheet = true

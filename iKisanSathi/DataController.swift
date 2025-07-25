@@ -1063,6 +1063,69 @@ class DataController: ObservableObject {
         return publicURL
     }
     
+    // New method for uploading multiple equipment images
+    func uploadMultipleEquipmentImages(_ imageDataArray: [Data]) async throws -> [String] {
+        var urls: [String] = []
+        
+        for imageData in imageDataArray {
+            let fileName = "\(UUID().uuidString).jpg"
+            let filePath = "equipment_images/\(fileName)"
+            
+            // Upload the image to Supabase storage
+            try await supabase.storage
+                .from("equipment")
+                .upload(
+                    path: filePath,
+                    file: imageData
+                )
+            
+            // Get the public URL for the uploaded image
+            let publicURL = "https://pxuuupiqeipyemluyers.supabase.co/storage/v1/object/public/equipment/\(filePath)"
+            urls.append(publicURL)
+        }
+        
+        return urls
+    }
+    
+    // Method to save additional images to equipmentMoreImages table
+    func saveEquipmentMoreImages(equipmentID: UUID, imageUrls: [String]) async throws {
+        for imageUrl in imageUrls {
+            let equipmentImage = EquipmentMoreImage(
+                equipmentID: equipmentID,
+                image: imageUrl
+            )
+            
+            try await supabase.database
+                .from("equipmentMoreImages")
+                .insert(equipmentImage)
+                .execute()
+        }
+    }
+    
+    // Struct for equipmentMoreImages table
+    struct EquipmentMoreImage: Codable {
+        let equipmentID: UUID
+        let image: String
+        
+        enum CodingKeys: String, CodingKey {
+            case equipmentID = "equipmentID"
+            case image
+        }
+    }
+    
+    // Method to fetch additional images for equipment
+    func fetchEquipmentMoreImages(equipmentID: UUID) async throws -> [String] {
+        let response = try await supabase.database
+            .from("equipmentMoreImages")
+            .select("image")
+            .eq("equipmentID", value: equipmentID.uuidString)
+            .execute()
+        
+        let decoder = JSONDecoder()
+        let images = try decoder.decode([EquipmentMoreImage].self, from: response.data)
+        return images.map { $0.image }
+    }
+    
     func fetchBookings() async throws {
         guard let currentUser = currentUser else { return }
         

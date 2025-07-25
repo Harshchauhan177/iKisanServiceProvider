@@ -187,27 +187,15 @@ struct HomeView: View {
                                     NavigationLink(destination: EditEquipmentView(equipment: equipment)) {
                                         VStack(alignment: .leading, spacing: 0) {
                                             ZStack(alignment: .topTrailing) {
-                                                if let url = URL(string: equipment.equipmentImage) {
-                                                    WebImage(url: url)
-                                                        .resizable()
-                                                        .scaledToFill()
-                                                        .frame(width: 180, height: 180)
-                                                        .clipped()
-                                                        .clipShape(
-                                                            RoundedCorner(radius: 12, corners: [.topLeft, .topRight])
-                                                        )
-                                                } else {
-                                                    Color(.systemGray5)
-                                                        .frame(width: 180, height: 180)
-                                                        .clipShape(
-                                                            RoundedCorner(radius: 12, corners: [.topLeft, .topRight])
-                                                        )
-                                                        .overlay(
-                                                            Image(systemName: "photo")
-                                                                .font(.system(size: 30))
-                                                                .foregroundColor(.gray)
-                                                        )
-                                                }
+                                                EquipmentImageCarousel(
+                                                    mainImageUrl: equipment.equipmentImage,
+                                                    equipmentID: equipment.equipmentID
+                                                )
+                                                .frame(width: 180, height: 180)
+                                                .clipped()
+                                                .clipShape(
+                                                    RoundedCorner(radius: 12, corners: [.topLeft, .topRight])
+                                                )
                                             }
                                             
                                             VStack(alignment: .leading, spacing: 8) {
