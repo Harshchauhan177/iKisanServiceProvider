@@ -15,35 +15,38 @@ struct ProfileView: View {
             ScrollView {
                 VStack(spacing: 20) {
                     // Profile Header with Image
-                    VStack {
-                        Image(systemName: "person.circle.fill")
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: 100, height: 100)
-                            .foregroundColor(.green)
-                            .background(Circle().fill(Color.white))
-                            .overlay(Circle().stroke(Color.gray.opacity(0.2), lineWidth: 1))
-                        
-                        Text(userProfile?.name ?? dataController.currentProducer?.name ?? "John Smith")
-                            .font(.title)
-                            .fontWeight(.bold)
-                            .padding(.top, 8)
-                        
-                        Text(userProfile?.email ?? dataController.currentUser?.email ?? "john.smith@email.com")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                        
-                        Text(userProfile?.phone ?? dataController.currentProducer?.phone ?? "+1 (555) 123-4567")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .padding(.top, 2)
-                        
-                        Text(userProfile?.address ?? dataController.currentProducer?.location ?? "123 Farmland Road, Agricultural Valley, AV 12345")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.top, 2)
-                            .padding(.horizontal)
+                    VStack(alignment: .leading, spacing: 16) {
+                        VStack(alignment: .center) {
+                            Image(systemName: "person.circle.fill")
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: 100, height: 100)
+                                .foregroundColor(.green)
+                                .background(Circle().fill(Color.white))
+                                .overlay(Circle().stroke(Color.gray.opacity(0.2), lineWidth: 1))
+                            
+                            Text(userProfile?.name ?? dataController.currentProducer?.name ?? "John Smith")
+                                .font(.title)
+                                .fontWeight(.bold)
+                                .padding(.top, 8)
+                            
+                            Text(userProfile?.email ?? dataController.currentUser?.email ?? "john.smith@email.com")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            
+                            Text(userProfile?.phone ?? dataController.currentProducer?.phone ?? "+1 (555) 123-4567")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .padding(.top, 2)
+                            
+                            Text(userProfile?.address ?? dataController.currentProducer?.location ?? "123 Farmland Road, Agricultural Valley, AV 12345")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.top, 2)
+                                .padding(.horizontal)
+                        }
+                        .frame(maxWidth: .infinity)
                     }
                     .padding()
                     .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemBackground)))
