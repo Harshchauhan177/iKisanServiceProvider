@@ -1261,4 +1261,40 @@ class DataController: ObservableObject {
         // Fetch producer details
         try? await fetchProducerDetails()
     }
+    
+    // Fetch user profile from the users table
+    func fetchUserProfile(email: String) async throws -> [UserProfile] {
+        let response = try await supabase.database
+            .from("users")
+            .select()
+            .eq("email", value: email)
+            .execute()
+        
+        return try JSONDecoder().decode([UserProfile].self, from: response.data)
+    }
+    
+    // UserProfile struct for decoding user data from the users table
+    struct UserProfile: Codable {
+        let userID: UUID
+        let name: String
+        let phone: String
+        let latitude: Double?
+        let longitude: Double?
+        let address: String?
+        let fieldArea: Double?
+        let groupID: UUID?
+        let email: String
+        
+        enum CodingKeys: String, CodingKey {
+            case userID = "userID"
+            case name
+            case phone
+            case latitude
+            case longitude
+            case address
+            case fieldArea
+            case groupID = "groupID"
+            case email
+        }
+    }
 }
