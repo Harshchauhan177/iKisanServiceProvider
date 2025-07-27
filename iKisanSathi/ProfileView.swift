@@ -209,6 +209,66 @@ struct ProfileView: View {
                     .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemBackground)))
                     .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
                     
+                    // Legal Section with both cards
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("LEGAL")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal)
+                            .padding(.bottom, 8)
+                        
+                        VStack(spacing: 0) {
+                            // Terms & Privacy Policy Card
+                            NavigationLink(destination: TermsPrivacyView()) {
+                                HStack {
+                                    Image(systemName: "doc.text.fill")
+                                        .foregroundColor(.green)
+                                        .frame(width: 30, height: 30)
+                                        .background(Color(.systemGray6))
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    
+                                    Text("Terms & Privacy Policy")
+                                        .font(.headline)
+                                        .foregroundColor(.primary)
+                                    
+                                    Spacer()
+                                    
+                                    Image(systemName: "chevron.right")
+                                        .foregroundColor(.gray)
+                                }
+                                .padding()
+                            }
+                            
+                            Divider()
+                                .padding(.horizontal)
+                            
+                            // App Info Card
+                            NavigationLink(destination: AppInfoView()) {
+                                HStack {
+                                    Image(systemName: "info.circle.fill")
+                                        .foregroundColor(.green)
+                                        .frame(width: 30, height: 30)
+                                        .background(Color(.systemGray6))
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    
+                                    Text("App Info")
+                                        .font(.headline)
+                                        .foregroundColor(.primary)
+                                    
+                                    Spacer()
+                                    
+                                    Image(systemName: "chevron.right")
+                                        .foregroundColor(.gray)
+                                }
+                                .padding()
+                            }
+                        }
+                        .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemBackground)))
+                        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+                    }
+                    
+                    
                     // Sign Out Button
                     Button {
                         Task {
