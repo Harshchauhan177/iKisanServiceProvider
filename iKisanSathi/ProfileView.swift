@@ -134,11 +134,18 @@ struct ProfileView: View {
                     .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
                     
                     // Account Details Section
-                    VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 0) {
                         Text("Account Details")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .padding(.bottom, 4)
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal)
+                            .padding(.bottom, 8)
+                    VStack(alignment: .leading, spacing: 16) {
+//                        Text("Account Details")
+//                            .font(.title2)
+//                            .fontWeight(.bold)
+//                            .padding(.bottom, 4)
                         
                         // Rating
 //                        HStack {
@@ -158,7 +165,8 @@ struct ProfileView: View {
                         // Account Number
                         HStack {
                             Text("Account Number:")
-                                .foregroundColor(.secondary)
+                                .font(.headline)
+                                .foregroundColor(.primary)
                             Spacer()
                             if isEditMode {
                                 TextField("Account Number", text: $accountNo)
@@ -171,7 +179,8 @@ struct ProfileView: View {
                         // IFSC Code
                         HStack {
                             Text("IFSC Code:")
-                                .foregroundColor(.secondary)
+                                .font(.headline)
+                                .foregroundColor(.primary)
                             Spacer()
                             if isEditMode {
                                 TextField("IFSC Code", text: $ifcsCode)
@@ -209,6 +218,42 @@ struct ProfileView: View {
                     .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemBackground)))
                     .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
                     
+                    }
+
+                    
+                    // Help Center Card
+                     VStack(alignment: .leading, spacing: 0) {
+                        Text("ACTIONS")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal)
+                            .padding(.bottom, 8)
+
+                    VStack(alignment: .leading, spacing: 0) {
+                        NavigationLink(destination: HelpCenterView()) {
+                            HStack {
+                                Image(systemName: "questionmark.circle.fill")
+                                    .foregroundColor(.green)
+                                    .frame(width: 30, height: 30)
+                                    .background(Color(.systemGray6))
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                
+                                Text("Help Center")
+                                    .font(.headline)
+                                    .foregroundColor(.primary)
+                                
+                                Spacer()
+                                
+                                Image(systemName: "chevron.right")
+                                    .foregroundColor(.gray)
+                            }
+                            .padding()
+                        }
+                    }
+                    .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemBackground)))
+                    .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+                     }
                     // Legal Section with both cards
                     VStack(alignment: .leading, spacing: 0) {
                         Text("LEGAL")
