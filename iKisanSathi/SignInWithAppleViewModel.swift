@@ -15,16 +15,23 @@ class SignInWithAppleViewModel: NSObject, ObservableObject {
     @Published var isLoading = false
     @Published var isAuthenticated = false
     @Published var navigateToHome = false
+    @Published var showProfileCompletion = false
     @Published var errorMessage: String?
     @Published var lastSupabaseSession: Session?
     
     private var currentNonce: String?
     private var client: SupabaseClient!
+    private var pendingUserData: (id: UUID, name: String, email: String)?
+    
+    var pendingUserEmail: String {
+        return pendingUserData?.email ?? ""
+    }
     
     private enum UserDefaultsKeys {
         static let sessionKey = "supabase_session"
         static let userIdKey = "user_id"
         static let userEmailKey = "user_email"
+        static let profileCompletedKey = "profile_completed"
     }
     
     override init() {
@@ -47,10 +54,39 @@ class SignInWithAppleViewModel: NSObject, ObservableObject {
                    let refreshToken = sessionDict["refreshToken"] {
                     do {
                         try await client.auth.setSession(accessToken: accessToken, refreshToken: refreshToken)
+                        
+                        // Check if profile is completed
+                        let profileCompleted = UserDefaults.standard.bool(forKey: UserDefaultsKeys.profileCompletedKey)
+                        
                         await MainActor.run {
                             self.isAuthenticated = true
-                            self.navigateToHome = true
-                            print("✅ Session restored")
+                            if profileCompleted {
+                                self.navigateToHome = true
+                                // If profile is completed and we have a session, we should also notify DataController
+                                // This will be handled by the app when navigateToHome becomes true
+                            } else {
+                                // Set pending user data from saved session for profile completion
+                                if let userId = UserDefaults.standard.string(forKey: UserDefaultsKeys.userIdKey),
+                                   let userEmail = UserDefaults.standard.string(forKey: UserDefaultsKeys.userEmailKey),
+                                   let userUUID = UUID(uuidString: userId) {
+                                    self.pendingUserData = (id: userUUID, name: "iKisan Producer", email: userEmail)
+                                    self.showProfileCompletion = true
+                                } else {
+                                    // If we can't restore user data, need to clear session
+                                    print("❌ Cannot restore user data - clearing session")
+                                }
+                            }
+                            print("✅ Session restored - Profile completed: \(profileCompleted)")
+                        }
+                        
+                        // Clear session if we couldn't restore user data for incomplete profile
+                        if !profileCompleted {
+                            let userId = UserDefaults.standard.string(forKey: UserDefaultsKeys.userIdKey)
+                            let userEmail = UserDefaults.standard.string(forKey: UserDefaultsKeys.userEmailKey)
+                            if userId == nil || userEmail == nil {
+                                await clearSession()
+                                return
+                            }
                         }
                     } catch {
                         print("❌ Failed to set session: \(error)")
@@ -82,7 +118,7 @@ class SignInWithAppleViewModel: NSObject, ObservableObject {
                     try await client.auth.setSession(accessToken: session.accessToken, refreshToken: session.refreshToken)
                     await MainActor.run {
                         self.isAuthenticated = true
-                        self.navigateToHome = true
+                        // Don't navigate to home immediately - let profile completion handle navigation
                     }
                     print("✅ Session saved and set")
                 } catch {
@@ -100,8 +136,10 @@ class SignInWithAppleViewModel: NSObject, ObservableObject {
             UserDefaults.standard.removeObject(forKey: UserDefaultsKeys.sessionKey)
             UserDefaults.standard.removeObject(forKey: UserDefaultsKeys.userIdKey)
             UserDefaults.standard.removeObject(forKey: UserDefaultsKeys.userEmailKey)
+            UserDefaults.standard.removeObject(forKey: UserDefaultsKeys.profileCompletedKey)
             self.isAuthenticated = false
             self.navigateToHome = false
+            self.showProfileCompletion = false
         }
     }
 
@@ -158,33 +196,16 @@ class SignInWithAppleViewModel: NSObject, ObservableObject {
             // Save the session
             await saveSession(session)
 
+            // Store pending user data for profile completion
             // Always use email from Supabase session if Apple didn't provide it
             let finalEmail = rawEmail.isEmpty ? (session.user.email ?? "") : rawEmail
+            self.pendingUserData = (id: session.user.id, name: finalName, email: finalEmail)
 
-            if !finalEmail.isEmpty {
-                do {
-                    print("🔄 Attempting to upsert into Producer table...")
-                    try await insertIntoProducerTable(
-                        id: session.user.id,
-                        name: finalName,
-                        email: finalEmail
-                    )
-                    print("✅ Successfully upserted into Producer table")
-                    
-                    // Set authentication state
-                    await MainActor.run {
-                        self.isAuthenticated = true
-                        self.navigateToHome = true
-                        self.errorMessage = nil
-                    }
-                } catch let error as PostgrestError {
-                    print("⚠️ Postgrest Error:", error.message)
-                    if !error.message.contains("duplicate key value") {
-                        await MainActor.run {
-                            self.errorMessage = "Failed to save producer data: \(error.message)"
-                        }
-                    }
-                }
+            // Show profile completion screen
+            await MainActor.run {
+                self.showProfileCompletion = true
+                self.errorMessage = nil
+                print("✅ Profile completion screen should be shown - showProfileCompletion: \(self.showProfileCompletion)")
             }
             
         } catch {
@@ -198,6 +219,106 @@ class SignInWithAppleViewModel: NSObject, ObservableObject {
         }
         
         await MainActor.run { self.isLoading = false }
+    }
+
+    func completeProfile(name: String, phone: String) async {
+        guard let userData = pendingUserData else {
+            await MainActor.run {
+                self.errorMessage = "User data not found. Please sign in again."
+            }
+            return
+        }
+        
+        do {
+            print("🔄 Attempting to upsert into Producer table with profile data...")
+            try await insertIntoProducerTableWithPhone(
+                id: userData.id,
+                name: name,
+                email: userData.email,
+                phone: phone
+            )
+            print("✅ Successfully upserted into Producer table with profile data")
+            
+            // Mark profile as completed
+            await MainActor.run {
+                UserDefaults.standard.set(true, forKey: UserDefaultsKeys.profileCompletedKey)
+                self.showProfileCompletion = false
+                self.navigateToHome = true
+                self.errorMessage = nil
+                self.pendingUserData = nil
+            }
+        } catch let error as PostgrestError {
+            print("⚠️ Postgrest Error:", error.message)
+            await MainActor.run {
+                if error.message.contains("duplicate key value") {
+                    // User already exists, just mark profile as completed
+                    UserDefaults.standard.set(true, forKey: UserDefaultsKeys.profileCompletedKey)
+                    self.showProfileCompletion = false
+                    self.navigateToHome = true
+                    self.errorMessage = nil
+                    self.pendingUserData = nil
+                } else {
+                    self.errorMessage = "Failed to save profile data: \(error.message)"
+                }
+            }
+        } catch {
+            print("❌ Profile completion error: \(error.localizedDescription)")
+            await MainActor.run {
+                self.errorMessage = "Profile completion failed: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    func signOut() async {
+        do {
+            try await client.auth.signOut()
+            await clearSession()
+            print("✅ User signed out successfully")
+        } catch {
+            print("❌ Sign out error: \(error.localizedDescription)")
+        }
+    }
+    
+    // For testing - reset profile completion status
+    func resetProfileCompletion() {
+        UserDefaults.standard.removeObject(forKey: UserDefaultsKeys.profileCompletedKey)
+        pendingUserData = nil
+        showProfileCompletion = false
+        navigateToHome = false
+        print("🔄 Profile completion status reset")
+    }
+    
+    // For testing - complete reset
+    func resetForTesting() async {
+        await signOut()
+        resetProfileCompletion()
+        await MainActor.run {
+            self.isAuthenticated = false
+            self.navigateToHome = false
+            self.showProfileCompletion = false
+            self.errorMessage = nil
+            self.lastSupabaseSession = nil
+            self.pendingUserData = nil
+        }
+        print("🔄 Complete reset for testing performed")
+    }
+    
+    // Debug method to check current state
+    func debugCurrentState() {
+        let hasSession = UserDefaults.standard.string(forKey: UserDefaultsKeys.sessionKey) != nil
+        let profileCompleted = UserDefaults.standard.bool(forKey: UserDefaultsKeys.profileCompletedKey)
+        let userId = UserDefaults.standard.string(forKey: UserDefaultsKeys.userIdKey)
+        let userEmail = UserDefaults.standard.string(forKey: UserDefaultsKeys.userEmailKey)
+        
+        print("🔍 DEBUG STATE:")
+        print("   - Has Session: \(hasSession)")
+        print("   - Profile Completed: \(profileCompleted)")
+        print("   - User ID: \(userId ?? "nil")")
+        print("   - User Email: \(userEmail ?? "nil")")
+        print("   - isAuthenticated: \(isAuthenticated)")
+        print("   - navigateToHome: \(navigateToHome)")
+        print("   - showProfileCompletion: \(showProfileCompletion)")
+        print("   - pendingUserData: \(pendingUserData != nil ? "set" : "nil")")
     }
 
     private func insertIntoProducerTable(id: UUID, name: String, email: String) async throws {
@@ -238,6 +359,47 @@ class SignInWithAppleViewModel: NSObject, ObservableObject {
             .upsert(producerData, onConflict: "id")
             .execute()
         print("✅ Database upsert completed")
+    }
+
+    private func insertIntoProducerTableWithPhone(id: UUID, name: String, email: String, phone: String) async throws {
+        print("🔄 Creating ProducerData with phone:")
+        print("   - ID: \(id)")
+        print("   - Name: \(name)")
+        print("   - Email: \(email)")
+        print("   - Phone: \(phone)")
+        
+        struct ProducerDataWithPhone: Encodable {
+            let id: UUID
+            let name: String
+            let email: String
+            let phone: String
+            let location: String?
+            let rating: Double?
+            let profileimage: String?
+            let equipments: [String]?
+            let accountNo: String?
+            let ifcsCode: String?
+        }
+
+        let producerData = ProducerDataWithPhone(
+            id: id,
+            name: name,
+            email: email,
+            phone: phone,
+            location: nil,
+            rating: nil,
+            profileimage: nil,
+            equipments: nil,
+            accountNo: nil,
+            ifcsCode: nil
+        )
+
+        print("🔄 Executing database upsert with phone...")
+        try await client.database
+            .from("producer")
+            .upsert(producerData, onConflict: "id")
+            .execute()
+        print("✅ Database upsert with phone completed")
     }
 
     // MARK: - Nonce Utilities
@@ -310,33 +472,16 @@ extension SignInWithAppleViewModel: ASAuthorizationControllerDelegate, ASAuthori
                 // Save the session
                 await saveSession(session)
 
+                // Store pending user data for profile completion
                 // Always use email from Supabase session if Apple didn't provide it
                 let finalEmail = rawEmail.isEmpty ? (session.user.email ?? "") : rawEmail
+                self.pendingUserData = (id: session.user.id, name: finalName, email: finalEmail)
 
-                if !finalEmail.isEmpty {
-                    do {
-                        print("🔄 Attempting to upsert into Producer table...")
-                        try await insertIntoProducerTable(
-                            id: session.user.id,
-                            name: finalName,
-                            email: finalEmail
-                        )
-                        print("✅ Successfully upserted into Producer table")
-                        
-                        // Set authentication state
-                        await MainActor.run {
-                            self.isAuthenticated = true
-                            self.navigateToHome = true
-                            self.errorMessage = nil
-                        }
-                    } catch let error as PostgrestError {
-                        print("⚠️ Postgrest Error:", error.message)
-                        if !error.message.contains("duplicate key value") {
-                            await MainActor.run {
-                                self.errorMessage = "Failed to save producer data: \(error.message)"
-                            }
-                        }
-                    }
+                // Show profile completion screen
+                await MainActor.run {
+                    self.showProfileCompletion = true
+                    self.errorMessage = nil
+                    print("✅ Profile completion screen should be shown (delegate) - showProfileCompletion: \(self.showProfileCompletion)")
                 }
                 
             } catch {
@@ -345,6 +490,7 @@ extension SignInWithAppleViewModel: ASAuthorizationControllerDelegate, ASAuthori
                     self.errorMessage = "Sign-in failed: \(error.localizedDescription)"
                     self.isAuthenticated = false
                     self.navigateToHome = false
+                    self.showProfileCompletion = false
                 }
                 await clearSession()
             }
