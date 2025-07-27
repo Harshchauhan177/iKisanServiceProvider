@@ -29,6 +29,7 @@ struct AddEquipmentView: View {
     @State private var showingAlert = false
     @State private var alertMessage = ""
     @State private var showingLocationPicker = false
+    @State private var isSaving = false
     
     // Validation states
     @State private var nameError: String? = nil
@@ -66,12 +67,14 @@ struct AddEquipmentView: View {
                     Button("Cancel") {
                         dismiss()
                     }
+                    .disabled(isSaving)
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Save") {
                         saveEquipment()
                     }
+                    .disabled(isSaving)
                 }
             }
             .alert("Equipment Status", isPresented: $showingAlert) {
@@ -488,12 +491,15 @@ struct AddEquipmentView: View {
             return
         }
         
+        isSaving = true // Start saving
+        
         // Save to Supabase
         Task {
             do {
                 guard let currentUser = dataController.currentUser else {
                     alertMessage = "User not logged in"
                     showingAlert = true
+                    isSaving = false
                     return
                 }
                 
@@ -503,6 +509,7 @@ struct AddEquipmentView: View {
                 guard !imageUrls.isEmpty else {
                     alertMessage = "Failed to upload images"
                     showingAlert = true
+                    isSaving = false
                     return
                 }
                 
@@ -549,6 +556,7 @@ struct AddEquipmentView: View {
                 alertMessage = "Error adding equipment: \(error.localizedDescription)"
                 showingAlert = true
             }
+            isSaving = false // End saving
         }
     }
     
