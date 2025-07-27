@@ -221,7 +221,7 @@ struct ProfileView: View {
                     }
 
                     
-                    // Help Center Card
+                    // Actions Section
                      VStack(alignment: .leading, spacing: 0) {
                         Text("ACTIONS")
                             .font(.subheadline)
@@ -230,29 +230,54 @@ struct ProfileView: View {
                             .padding(.horizontal)
                             .padding(.bottom, 8)
 
-                    VStack(alignment: .leading, spacing: 0) {
-                        NavigationLink(destination: HelpCenterView()) {
-                            HStack {
-                                Image(systemName: "questionmark.circle.fill")
-                                    .foregroundColor(.green)
-                                    .frame(width: 30, height: 30)
-                                    .background(Color(.systemGray6))
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                                
-                                Text("Help Center")
-                                    .font(.headline)
-                                    .foregroundColor(.primary)
-                                
-                                Spacer()
-                                
-                                Image(systemName: "chevron.right")
-                                    .foregroundColor(.gray)
+                        VStack(spacing: 0) {
+                            // Help Center Card
+                            NavigationLink(destination: HelpCenterView()) {
+                                HStack {
+                                    Image(systemName: "questionmark.circle.fill")
+                                        .foregroundColor(.green)
+                                        .frame(width: 30, height: 30)
+                                        .background(Color(.systemGray6))
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    
+                                    Text("Help Center")
+                                        .font(.headline)
+                                        .foregroundColor(.primary)
+                                    
+                                    Spacer()
+                                    
+                                    Image(systemName: "chevron.right")
+                                        .foregroundColor(.gray)
+                                }
+                                .padding()
                             }
-                            .padding()
+                            
+                            Divider()
+                                .padding(.horizontal)
+                            
+                            // Update Address Card
+                            NavigationLink(destination: LocationUpdateView()) {
+                                HStack {
+                                    Image(systemName: "mappin.circle.fill")
+                                        .foregroundColor(.green)
+                                        .frame(width: 30, height: 30)
+                                        .background(Color(.systemGray6))
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    
+                                    Text("Update Address")
+                                        .font(.headline)
+                                        .foregroundColor(.primary)
+                                    
+                                    Spacer()
+                                    
+                                    Image(systemName: "chevron.right")
+                                        .foregroundColor(.gray)
+                                }
+                                .padding()
+                            }
                         }
-                    }
-                    .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemBackground)))
-                    .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+                        .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemBackground)))
+                        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
                      }
                     // Legal Section with both cards
                     VStack(alignment: .leading, spacing: 0) {
