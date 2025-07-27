@@ -2,7 +2,7 @@
 //  DataModelProducer.swift
 //  iKisanApp
 //
-//  Created by Harsh  Kumar on 28/04/25.
+//  Created by Harsh chauhan on 28/04/25.
 //
 
 import Foundation
@@ -223,15 +223,15 @@ struct Request: Codable, Identifiable {
 
 struct Producer: Codable {
     let id: UUID
-    let name: String
+    var name: String
     let email: String
-    let phone: String?
-    let location: String?
+    var phone: String?
+    var location: String?
     let rating: Double?
     let profileimage: String?
     let equipments: [String]?
-    let accountNo: String?
-    let ifcsCode: String?
+    var accountNo: String?
+    var ifcsCode: String?
 }
 
 struct ServiceRequests: Codable {

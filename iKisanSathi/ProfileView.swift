@@ -1,3 +1,10 @@
+//
+//  SignInWithAppleViewModel.swift
+//  iKisanSathi
+//
+//  Created by harsh chauhan on 03/06/25.
+//
+
 import SwiftUI
 
 struct ProfileView: View {
@@ -7,10 +14,22 @@ struct ProfileView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var showingError = false
+    @State private var isEditMode = false
+    
+    // Editable fields
+    @State private var name = ""
+    @State private var phone = ""
+    @State private var location = ""
+    @State private var accountNo = ""
+    @State private var ifcsCode = ""
     
     var body: some View {
         ZStack {
             Color(.systemGray6).edgesIgnoringSafeArea(.all)
+            
+            if isLoading {
+                LoadingView()
+            }
             
             ScrollView {
                 VStack(spacing: 20) {
@@ -62,26 +81,51 @@ struct ProfileView: View {
                                 }
                             }
                             
-                            Text(userProfile?.name ?? dataController.currentProducer?.name ?? "John Smith")
-                                .font(.title)
-                                .fontWeight(.bold)
-                                .padding(.top, 8)
+                            if isEditMode {
+                                TextField("Name", text: $name)
+                                    .font(.title)
+                                    .fontWeight(.bold)
+                                    .multilineTextAlignment(.center)
+                                    .padding(.top, 8)
+                            } else {
+                                Text(userProfile?.name ?? dataController.currentProducer?.name ?? "John Smith")
+                                    .font(.title)
+                                    .fontWeight(.bold)
+                                    .padding(.top, 8)
+                            }
                             
                             Text(userProfile?.email ?? dataController.currentUser?.email ?? "john.smith@email.com")
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                             
-                            Text(userProfile?.phone ?? dataController.currentProducer?.phone ?? "+1 (555) 123-4567")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                                .padding(.top, 2)
+                            if isEditMode {
+                                TextField("Phone", text: $phone)
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
+                                    .padding(.top, 2)
+                            } else {
+                                Text(userProfile?.phone ?? dataController.currentProducer?.phone ?? "+1 (555) 123-4567")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                    .padding(.top, 2)
+                            }
                             
-                            Text(userProfile?.location ?? dataController.currentProducer?.location ?? "123 Farmland Road, Agricultural Valley, AV 12345")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                                .multilineTextAlignment(.center)
-                                .padding(.top, 2)
-                                .padding(.horizontal)
+                            if isEditMode {
+                                TextField("Location", text: $location)
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
+                                    .padding(.top, 2)
+                                    .padding(.horizontal)
+                            } else {
+                                Text(userProfile?.location ?? dataController.currentProducer?.location ?? "123 Farmland Road, Agricultural Valley, AV 12345")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
+                                    .padding(.top, 2)
+                                    .padding(.horizontal)
+                            }
                         }
                         .frame(maxWidth: .infinity)
                     }
@@ -116,7 +160,12 @@ struct ProfileView: View {
                             Text("Account Number:")
                                 .foregroundColor(.secondary)
                             Spacer()
-                            Text(userProfile?.accountNo ?? dataController.currentProducer?.accountNo ?? "Not provided")
+                            if isEditMode {
+                                TextField("Account Number", text: $accountNo)
+                                    .multilineTextAlignment(.trailing)
+                            } else {
+                                Text(userProfile?.accountNo ?? dataController.currentProducer?.accountNo ?? "Not provided")
+                            }
                         }
                         
                         // IFSC Code
@@ -124,32 +173,37 @@ struct ProfileView: View {
                             Text("IFSC Code:")
                                 .foregroundColor(.secondary)
                             Spacer()
-                            Text(userProfile?.ifcsCode ?? dataController.currentProducer?.ifcsCode ?? "Not provided")
+                            if isEditMode {
+                                TextField("IFSC Code", text: $ifcsCode)
+                                    .multilineTextAlignment(.trailing)
+                            } else {
+                                Text(userProfile?.ifcsCode ?? dataController.currentProducer?.ifcsCode ?? "Not provided")
+                            }
                         }
                         
                         // Rating
-                        HStack {
-                            Text("Rating:")
-                                .foregroundColor(.secondary)
-                            Spacer()
-                            if let rating = userProfile?.rating ?? dataController.currentProducer?.rating {
-                                HStack(spacing: 2) {
-                                    ForEach(0..<Int(rating), id: \.self) { _ in
-                                        Image(systemName: "star.fill")
-                                            .foregroundColor(.green)
-                                    }
-                                    if rating - Double(Int(rating)) >= 0.5 {
-                                        Image(systemName: "star.leadinghalf.filled")
-                                            .foregroundColor(.green)
-                                    }
-                                }
-                                Text("\(String(format: "%.1f", rating))/5.0")
-                                    .foregroundColor(.secondary)
-                                    .padding(.leading, 4)
-                            } else {
-                                Text("Not rated yet")
-                            }
-                        }
+//                        HStack {
+//                            Text("Rating:")
+//                                .foregroundColor(.secondary)
+//                            Spacer()
+//                            if let rating = userProfile?.rating ?? dataController.currentProducer?.rating {
+//                                HStack(spacing: 2) {
+//                                    ForEach(0..<Int(rating), id: \.self) { _ in
+//                                        Image(systemName: "star.fill")
+//                                            .foregroundColor(.green)
+//                                    }
+//                                    if rating - Double(Int(rating)) >= 0.5 {
+//                                        Image(systemName: "star.leadinghalf.filled")
+//                                            .foregroundColor(.green)
+//                                    }
+//                                }
+//                                Text("\(String(format: "%.1f", rating))/5.0")
+//                                    .foregroundColor(.secondary)
+//                                    .padding(.leading, 4)
+//                            } else {
+//                                Text("Not rated yet")
+//                            }
+//                        }
                     }
                     .padding()
                     .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemBackground)))
@@ -178,6 +232,21 @@ struct ProfileView: View {
         }
         .navigationTitle("Profile")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(isEditMode ? "Save" : "Edit") {
+                    if isEditMode {
+                        // Save changes
+                        saveChanges()
+                    } else {
+                        // Enter edit mode
+                        enterEditMode()
+                    }
+                    isEditMode.toggle()
+                }
+                .foregroundColor(.blue)
+            }
+        }
         .onAppear {
             fetchUserProfile()
         }
@@ -212,4 +281,87 @@ struct ProfileView: View {
             }
         }
     }
+    
+    private func enterEditMode() {
+        // Initialize editable fields with current values
+        name = userProfile?.name ?? dataController.currentProducer?.name ?? ""
+        phone = userProfile?.phone ?? dataController.currentProducer?.phone ?? ""
+        location = userProfile?.location ?? dataController.currentProducer?.location ?? ""
+        accountNo = userProfile?.accountNo ?? dataController.currentProducer?.accountNo ?? ""
+        ifcsCode = userProfile?.ifcsCode ?? dataController.currentProducer?.ifcsCode ?? ""
+    }
+    
+    private func saveChanges() {
+        isLoading = true
+        
+        guard let currentProfile = userProfile else {
+            errorMessage = "Could not update profile: Profile data not available"
+            showingError = true
+            isLoading = false
+            return
+        }
+        
+        Task {
+            do {
+                // Update the profile in the database
+                try await updateUserProfile(userID: currentProfile.userID.uuidString)
+                
+                await MainActor.run {
+                    // Refresh the profile
+                    fetchUserProfile()
+                    isLoading = false
+                }
+            } catch {
+                await MainActor.run {
+                    errorMessage = "Failed to update profile: \(error.localizedDescription)"
+                    showingError = true
+                    isLoading = false
+                }
+            }
+        }
+    }
+    
+    private func updateUserProfile(userID: String) async throws {
+        // Create a struct that conforms to Encodable for the update
+        struct ProfileUpdate: Encodable {
+            let name: String
+            let phone: String
+            let location: String
+            let accountNo: String
+            let ifcsCode: String
+        }
+        
+        let updateData = ProfileUpdate(
+            name: name,
+            phone: phone,
+            location: location,
+            accountNo: accountNo,
+            ifcsCode: ifcsCode
+        )
+        
+        // Get access to the database through the dataController
+        let database = dataController.getDatabase()
+        
+        // Update the producer record in the database
+        try await database
+            .from("producer")
+            .update(updateData)
+            .eq("id", value: userID)
+            .execute()
+        
+        // Update the local currentProducer
+        await MainActor.run {
+            if var updatedProducer = dataController.currentProducer {
+                updatedProducer.name = name
+                updatedProducer.phone = phone
+                updatedProducer.location = location
+                updatedProducer.accountNo = accountNo
+                updatedProducer.ifcsCode = ifcsCode
+                
+                dataController.currentProducer = updatedProducer
+            }
+        }
+    }
+    
+
 }

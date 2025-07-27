@@ -1,3 +1,11 @@
+//
+//  SignInWithAppleViewModel.swift
+//  iKisanSathi
+//
+//  Created by harsh chauhan on 03/06/25.
+//
+
+
 import Foundation
 import Supabase
 
@@ -226,14 +234,14 @@ class DataController: ObservableObject {
     struct Producer: Codable {
         let id: String
         let email: String
-        let name: String
-        let phone: String?
-        let location: String?
+        var name: String
+        var phone: String?
+        var location: String?
         let rating: Double?
         let profileimage: String?
         let equipments: [Equipment]?
-        let accountNo: String?
-        let ifcsCode: String?
+        var accountNo: String?
+        var ifcsCode: String?
     }
     
     @Published var currentProducer: Producer?
@@ -1276,14 +1284,14 @@ class DataController: ObservableObject {
     // UserProfile struct for decoding user data from the producer table
     struct UserProfile: Codable {
         let userID: UUID
-        let name: String
-        let phone: String?
-        let location: String?
+        var name: String
+        var phone: String?
+        var location: String?
         let rating: Double?
         let profileimage: String?
         let equipments: [Equipment]?
-        let accountNo: String?
-        let ifcsCode: String?
+        var accountNo: String?
+        var ifcsCode: String?
         let email: String
         
         enum CodingKeys: String, CodingKey {
@@ -1298,5 +1306,10 @@ class DataController: ObservableObject {
             case ifcsCode
             case email
         }
+    }
+    
+    // Provide access to the database without exposing the private supabase property
+    func getDatabase() -> PostgrestClient {
+        return supabase.database
     }
 }
