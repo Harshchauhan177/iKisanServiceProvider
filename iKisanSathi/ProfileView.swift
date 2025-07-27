@@ -340,22 +340,28 @@ struct ProfileView: View {
                     
                     
                     // Sign Out Button
-                    Button {
-                        Task {
-                            try? await dataController.signOut()
+                    VStack(alignment: .leading, spacing: 0) {
+                        Button {
+                            Task {
+                                try? await dataController.signOut()
+                            }
+                        } label: {
+                            HStack {
+                                Image(systemName: "arrow.right.circle.fill")
+                                    .foregroundColor(.red)
+                                    .frame(width: 30, height: 30)
+                                    .background(Color(.systemGray6))
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                
+                                Text("Sign Out")
+                                    .foregroundColor(.red)
+                                Spacer()
+                            }
+                            .padding()
                         }
-                    } label: {
-                        HStack {
-                            Image(systemName: "arrow.right.circle.fill")
-                            Text("Sign Out")
-                        }
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.red)
-                        .cornerRadius(10)
+                        .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemBackground)))
+                        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
                     }
-                    .padding(.horizontal)
                 }
                 .padding()
             }
