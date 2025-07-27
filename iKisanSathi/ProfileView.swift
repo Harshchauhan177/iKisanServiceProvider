@@ -17,13 +17,50 @@ struct ProfileView: View {
                     // Profile Header with Image
                     VStack(alignment: .leading, spacing: 16) {
                         VStack(alignment: .center) {
-                            Image(systemName: "person.circle.fill")
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(width: 100, height: 100)
-                                .foregroundColor(.green)
-                                .background(Circle().fill(Color.white))
-                                .overlay(Circle().stroke(Color.gray.opacity(0.2), lineWidth: 1))
+                            Group {
+                                if let profileImageUrl = userProfile?.profileimage ?? dataController.currentProducer?.profileimage,
+                                   !profileImageUrl.isEmpty,
+                                   let url = URL(string: profileImageUrl) {
+                                    AsyncImage(url: url) { phase in
+                                        switch phase {
+                                        case .empty:
+                                            ProgressView()
+                                                .frame(width: 100, height: 100)
+                                        case .success(let image):
+                                            image
+                                                .resizable()
+                                                .aspectRatio(contentMode: .fill)
+                                                .frame(width: 100, height: 100)
+                                                .clipShape(Circle())
+                                                .overlay(Circle().stroke(Color.gray.opacity(0.2), lineWidth: 1))
+                                        case .failure:
+                                            Image(systemName: "person.circle.fill")
+                                                .resizable()
+                                                .aspectRatio(contentMode: .fit)
+                                                .frame(width: 100, height: 100)
+                                                .foregroundColor(.green)
+                                                .background(Circle().fill(Color.white))
+                                                .overlay(Circle().stroke(Color.gray.opacity(0.2), lineWidth: 1))
+                                        @unknown default:
+                                            Image(systemName: "person.circle.fill")
+                                                .resizable()
+                                                .aspectRatio(contentMode: .fit)
+                                                .frame(width: 100, height: 100)
+                                                .foregroundColor(.green)
+                                                .background(Circle().fill(Color.white))
+                                                .overlay(Circle().stroke(Color.gray.opacity(0.2), lineWidth: 1))
+                                        }
+                                    }
+                                } else {
+                                    Image(systemName: "person.circle.fill")
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fit)
+                                        .frame(width: 100, height: 100)
+                                        .foregroundColor(.green)
+                                        .background(Circle().fill(Color.white))
+                                        .overlay(Circle().stroke(Color.gray.opacity(0.2), lineWidth: 1))
+                                }
+                            }
                             
                             Text(userProfile?.name ?? dataController.currentProducer?.name ?? "John Smith")
                                 .font(.title)
@@ -39,7 +76,7 @@ struct ProfileView: View {
                                 .foregroundColor(.secondary)
                                 .padding(.top, 2)
                             
-                            Text(userProfile?.address ?? dataController.currentProducer?.location ?? "123 Farmland Road, Agricultural Valley, AV 12345")
+                            Text(userProfile?.location ?? dataController.currentProducer?.location ?? "123 Farmland Road, Agricultural Valley, AV 12345")
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                                 .multilineTextAlignment(.center)
@@ -60,26 +97,26 @@ struct ProfileView: View {
                             .padding(.bottom, 4)
                         
                         // Rating
-                        HStack {
-                            HStack(spacing: 2) {
-                                ForEach(0..<4, id: \.self) { _ in
-                                    Image(systemName: "star.fill")
-                                        .foregroundColor(.green)
-                                }
-                                Image(systemName: "star.leadinghalf.filled")
-                                    .foregroundColor(.green)
-                            }
-                            Text("4.8/5.0")
-                                .foregroundColor(.secondary)
-                                .padding(.leading, 4)
-                        }
+//                        HStack {
+//                            HStack(spacing: 2) {
+//                                ForEach(0..<4, id: \.self) { _ in
+//                                    Image(systemName: "star.fill")
+//                                        .foregroundColor(.green)
+//                                }
+//                                Image(systemName: "star.leadinghalf.filled")
+//                                    .foregroundColor(.green)
+//                            }
+//                            Text("4.8/5.0")
+//                                .foregroundColor(.secondary)
+//                                .padding(.leading, 4)
+//                        }
                         
                         // Account Number
                         HStack {
                             Text("Account Number:")
                                 .foregroundColor(.secondary)
                             Spacer()
-                            Text(userProfile?.phone ?? dataController.currentProducer?.phone ?? "+1 (555) 123-4567")
+                            Text(userProfile?.accountNo ?? dataController.currentProducer?.accountNo ?? "Not provided")
                         }
                         
                         // IFSC Code
@@ -87,16 +124,30 @@ struct ProfileView: View {
                             Text("IFSC Code:")
                                 .foregroundColor(.secondary)
                             Spacer()
-                            Text("IKIS00012345")
+                            Text(userProfile?.ifcsCode ?? dataController.currentProducer?.ifcsCode ?? "Not provided")
                         }
                         
-                        // Field Area
-                        if let fieldArea = userProfile?.fieldArea {
-                            HStack {
-                                Text("Field Area:")
+                        // Rating
+                        HStack {
+                            Text("Rating:")
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            if let rating = userProfile?.rating ?? dataController.currentProducer?.rating {
+                                HStack(spacing: 2) {
+                                    ForEach(0..<Int(rating), id: \.self) { _ in
+                                        Image(systemName: "star.fill")
+                                            .foregroundColor(.green)
+                                    }
+                                    if rating - Double(Int(rating)) >= 0.5 {
+                                        Image(systemName: "star.leadinghalf.filled")
+                                            .foregroundColor(.green)
+                                    }
+                                }
+                                Text("\(String(format: "%.1f", rating))/5.0")
                                     .foregroundColor(.secondary)
-                                Spacer()
-                                Text("\(String(format: "%.2f", fieldArea)) acres")
+                                    .padding(.leading, 4)
+                            } else {
+                                Text("Not rated yet")
                             }
                         }
                     }
