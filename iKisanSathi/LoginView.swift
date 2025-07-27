@@ -13,7 +13,7 @@ struct LoginView: View {
     
     var body: some View {
         Group {
-            if appleVM.isAuthenticated {
+            if appleVM.isAuthenticated && appleVM.navigateToHome {
                 MainTabView()
             } else {
                 VStack {
@@ -69,9 +69,8 @@ struct LoginView: View {
                             if let appleIDCredential = authResults.credential as? ASAuthorizationAppleIDCredential {
                                 Task {
                                     await appleVM.handleAppleSignIn(credential: appleIDCredential)
-                                    if let session = appleVM.lastSupabaseSession {
-                                        await dataController.setSessionFromApple(session: session)
-                                    }
+                                    // Don't set session in DataController until profile is completed
+                                    // This will be handled in the ProfileCompletionView when user submits
                                 }
                             }
                         case .failure(let error):
@@ -81,6 +80,19 @@ struct LoginView: View {
                     .signInWithAppleButtonStyle(.black)
                     .frame(height: 50)
                     .padding()
+                }
+            }
+        }
+        .sheet(isPresented: $appleVM.showProfileCompletion) {
+            ProfileCompletionView(userEmail: appleVM.pendingUserEmail, viewModel: appleVM)
+        }
+        .onChange(of: appleVM.navigateToHome) { navigateToHome in
+            if navigateToHome && appleVM.isAuthenticated {
+                // When navigating to home for existing users, set session in DataController
+                if let session = appleVM.lastSupabaseSession {
+                    Task {
+                        await dataController.setSessionFromApple(session: session)
+                    }
                 }
             }
         }
