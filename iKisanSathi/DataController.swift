@@ -1075,21 +1075,47 @@ class DataController: ObservableObject {
     func uploadMultipleEquipmentImages(_ imageDataArray: [Data]) async throws -> [String] {
         var urls: [String] = []
         
+        // Process images one at a time to ensure reliability
         for imageData in imageDataArray {
-            let fileName = "\(UUID().uuidString).jpg"
-            let filePath = "equipment_images/\(fileName)"
+            var retryCount = 0
+            var lastError: Error?
+            var uploaded = false
             
-            // Upload the image to Supabase storage
-            try await supabase.storage
-                .from("equipment")
-                .upload(
-                    path: filePath,
-                    file: imageData
-                )
+            while retryCount < 3 && !uploaded {
+                do {
+                    let fileName = "\(UUID().uuidString).jpg"
+                    let filePath = "equipment_images/\(fileName)"
+                    
+                    // Upload the image to Supabase storage
+                    try await supabase.storage
+                        .from("equipment")
+                        .upload(
+                            path: filePath,
+                            file: imageData,
+                            options: .init(contentType: "image/jpeg")
+                        )
+                    
+                    let publicURL = "https://pxuuupiqeipyemluyers.supabase.co/storage/v1/object/public/equipment/\(filePath)"
+                    urls.append(publicURL)
+                    uploaded = true
+                    
+                    // Add a small delay between uploads
+                    if imageData != imageDataArray.last {
+                        try await Task.sleep(nanoseconds: 500_000_000) // 0.5 second delay
+                    }
+                    
+                } catch {
+                    lastError = error
+                    retryCount += 1
+                    if retryCount < 3 {
+                        try await Task.sleep(nanoseconds: UInt64(pow(2.0, Double(retryCount))) * 1_000_000_000)
+                    }
+                }
+            }
             
-            // Get the public URL for the uploaded image
-            let publicURL = "https://pxuuupiqeipyemluyers.supabase.co/storage/v1/object/public/equipment/\(filePath)"
-            urls.append(publicURL)
+            if !uploaded {
+                throw lastError ?? NSError(domain: "UploadError", code: -1, userInfo: [NSLocalizedDescriptionKey: "Upload failed after retries"])
+            }
         }
         
         return urls

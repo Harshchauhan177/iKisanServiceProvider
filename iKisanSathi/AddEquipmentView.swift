@@ -190,7 +190,7 @@ struct AddEquipmentView: View {
                        photoLibrary: .shared()) {
                 HStack {
                     Image(systemName: "photo")
-                    Text(selectedImagesData.isEmpty ? "Select Equipment Photos" : "Change Photos")
+                    Text(selectedImagesData.isEmpty ? "Select Equipment Photos" : "Add More Photos")
                 }
                 .frame(maxWidth: .infinity)
                 .padding()
@@ -198,13 +198,40 @@ struct AddEquipmentView: View {
                 .foregroundColor(.white)
                 .cornerRadius(8)
             }
-        }
-        .onChange(of: selectedItems) { newItems in
-            Task {
-                selectedImagesData = []
-                for newItem in newItems {
-                    if let data = try? await newItem.loadTransferable(type: Data.self) {
-                        selectedImagesData.append(data)
+            .onChange(of: selectedItems) { newItems in
+                Task {
+                    // Don't clear existing images, process only new ones
+                    for newItem in newItems {
+                        if let data = try? await newItem.loadTransferable(type: Data.self),
+                           let uiImage = UIImage(data: data) {
+                            // Maximum allowed file size (500KB)
+                            let maxFileSize: Int = 500 * 1024
+                            
+                            // Compress with reducing dimensions first
+                            let maxDimension: CGFloat = 800
+                            let scale = min(maxDimension / uiImage.size.width, maxDimension / uiImage.size.height, 1.0)
+                            let newSize = CGSize(width: uiImage.size.width * scale, height: uiImage.size.height * scale)
+                            
+                            let renderer = UIGraphicsImageRenderer(size: newSize)
+                            let resizedImage = renderer.image { context in
+                                uiImage.draw(in: CGRect(origin: .zero, size: newSize))
+                            }
+                            
+                            // Start with high quality and progressively reduce until file size is acceptable
+                            var compressionQuality: CGFloat = 0.8
+                            var imageData = resizedImage.jpegData(compressionQuality: compressionQuality)
+                            
+                            while let data = imageData, data.count > maxFileSize && compressionQuality > 0.1 {
+                                compressionQuality -= 0.1
+                                imageData = resizedImage.jpegData(compressionQuality: compressionQuality)
+                            }
+                            
+                            if let finalImageData = imageData {
+                                await MainActor.run {
+                                    selectedImagesData.append(finalImageData)
+                                }
+                            }
+                        }
                     }
                 }
             }
