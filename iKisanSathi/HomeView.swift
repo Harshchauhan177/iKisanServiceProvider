@@ -293,7 +293,7 @@ struct HomeView: View {
                                             .font(.caption)
                                             .foregroundColor(.gray)
                                     }
-                                    .frame(width: 250)
+                                    .frame(width: UIScreen.main.bounds.width - 32)
                                     .padding()
                                     .background(Color(.systemBackground))
                                     .cornerRadius(12)
@@ -302,6 +302,7 @@ struct HomeView: View {
                                         NavigationLink(destination: ServiceRequestDetailView(serviceRequest: request)) {
                                             VStack(alignment: .leading, spacing: 16) {
                                                 HStack(spacing: 12) {
+                                                    // Equipment Image
                                                     if let equipment = dataController.equipmentDetails[request.equipmentname],
                                                        let url = URL(string: equipment.equipmentImage) {
                                                         WebImage(url: url)
@@ -319,31 +320,43 @@ struct HomeView: View {
                                                             )
                                                     }
                                                     
-                                                    VStack(alignment: .leading, spacing: 4) {
+                                                    // Equipment Details
+                                                    VStack(alignment: .leading, spacing: 6) {
                                                         if let equipment = dataController.equipmentDetails[request.equipmentname] {
                                                             Text(equipment.name)
-                                                                .font(.title3)
-                                                                .fontWeight(.semibold)
+                                                                .font(.headline)
                                                                 .foregroundColor(.primary)
+                                                                .lineLimit(1)
                                                             
-                                                            Text("Agricultural")
-                                                                .font(.subheadline)
-                                                                .foregroundColor(.secondary)
+                                                            HStack {
+                                                                Image(systemName: "wrench.and.screwdriver.fill")
+                                                                    .foregroundColor(.blue)
+                                                                    .font(.system(size: 12))
+                                                                Text(equipment.type)
+                                                                    .font(.subheadline)
+                                                                    .foregroundColor(.secondary)
+                                                            }
                                                             
-                                                            Text("Capacity: \(equipment.capacity)")
-                                                                .font(.subheadline)
-                                                                .foregroundColor(.secondary)
+                                                            HStack {
+                                                                Image(systemName: "ruler.fill")
+                                                                    .foregroundColor(.green)
+                                                                    .font(.system(size: 12))
+                                                                Text("\(String(format: "%.1f", request.area)) acres")
+                                                                    .font(.subheadline)
+                                                                    .foregroundColor(.secondary)
+                                                            }
                                                         }
                                                     }
                                                     Spacer()
                                                 }
-                                                .frame(maxWidth: .infinity)
-                                                
-                                                HStack(spacing: 16) {
+            
+                                                // Time and Date Section
+                                                HStack {
                                                     // Date
-                                                    HStack(spacing: 8) {
+                                                    HStack(spacing: 6) {
                                                         Image(systemName: "calendar")
                                                             .foregroundColor(.blue)
+                                                            .font(.system(size: 14))
                                                         let date = String(request.date.prefix(10))
                                                         Text(date)
                                                             .font(.subheadline)
@@ -353,29 +366,19 @@ struct HomeView: View {
                                                     Spacer()
                                                     
                                                     // Time
-                                                    HStack(spacing: 8) {
-                                                        Image(systemName: "clock")
+                                                    HStack(spacing: 6) {
+                                                        Image(systemName: "clock.fill")
                                                             .foregroundColor(.orange)
+                                                            .font(.system(size: 14))
                                                         Text(request.timeslot.rawValue)
                                                             .font(.subheadline)
                                                             .foregroundColor(.primary)
                                                     }
                                                 }
-                                                
-                                                // Area
-                                                HStack {
-                                                    Spacer()
-                                                    Text("\(String(format: "%.1f", request.area)) acres")
-                                                        .font(.headline)
-                                                        .foregroundColor(.blue)
-                                                        .padding(.horizontal, 12)
-                                                        .padding(.vertical, 6)
-                                                        .background(Color.blue.opacity(0.1))
-                                                        .cornerRadius(8)
-                                                }
+                                                .padding(.top, 4)
                                             }
                                             .padding(16)
-                                            .frame(width: UIScreen.main.bounds.width - 32) // Match Add Equipment card width
+                                            .frame(width: UIScreen.main.bounds.width - 32)
                                             .background(Color(.systemBackground))
                                             .cornerRadius(16)
                                             .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
