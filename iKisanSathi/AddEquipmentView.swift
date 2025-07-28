@@ -12,15 +12,16 @@ struct AddEquipmentView: View {
     @State private var capacity = ""
     @State private var availabilityStartDate = Date()
     @State private var availabilityEndDate = Date().addingTimeInterval(30*24*60*60) // 30 days ahead
-    @State private var pricePerHour: Double = 0.0
-    @State private var realPricePerHour: Double = 0.0
-    @State private var pricePerAcre: Double = 0.0
-    @State private var realPricePerAcre: Double = 0.0
+    @State private var pricePerHour: Double? = nil
+    @State private var realPricePerHour: Double? = nil
+    @State private var pricePerAcre: Double? = nil
+    @State private var realPricePerAcre: Double? = nil
     @State private var rating = 5.0
     @State private var location = ""
     @State private var selectedLatitude: Double?
     @State private var selectedLongitude: Double?
     @State private var coEquipDetail = coEquipState.Available
+    @State private var isEquipmentAvailable = true // New boolean for toggle
     @State private var modelYear = ""
     @State private var mielage = ""
     @State private var description = ""
@@ -395,9 +396,22 @@ struct AddEquipmentView: View {
             TextField("Model Year", text: $modelYear)
                 .keyboardType(.numberPad)
                 .onChange(of: modelYear) { newValue in
-                    // Validate model year as a number within the valid range
-                    if let value = Int(newValue), value < minYear || value > currentYear {
-                        modelYear = ""
+                    // Filter to keep only numeric characters
+                    let filtered = newValue.filter { $0.isNumber }
+                    
+                    // Limit to 4 digits and validate year range
+                    if filtered.count <= 4 {
+                        if let year = Int(filtered), year >= minYear && year <= currentYear {
+                            modelYear = filtered
+                        } else if filtered.isEmpty {
+                            modelYear = ""
+                        } else if filtered.count == 4 {
+                            // Invalid year range, clear the field
+                            modelYear = ""
+                        } else {
+                            // Allow partial entry while typing
+                            modelYear = filtered
+                        }
                     }
                 }
             TextField("Mileage", text: $mielage)
@@ -420,11 +434,10 @@ struct AddEquipmentView: View {
     
     private var statusSection: some View {
         Section(header: Text("Status")) {
-            Picker("Equipment Status", selection: $coEquipDetail) {
-                Text("Available").tag(coEquipState.Available)
-                Text("Unavailable").tag(coEquipState.Unavailable)
-            }
-            Toggle("Recommended Equipment", isOn: $isRecommended)
+            Toggle("Want to list for Co-Equip", isOn: $isEquipmentAvailable)
+                .onChange(of: isEquipmentAvailable) { newValue in
+                    coEquipDetail = newValue ? .Available : .Unavailable
+                }
         }
     }
     
@@ -462,10 +475,10 @@ struct AddEquipmentView: View {
         }
         
         // Price Validation
-        guard pricePerHour > 0,
-              realPricePerHour > 0,
-              pricePerAcre > 0,
-              realPricePerAcre > 0 else {
+        guard pricePerHour != nil,
+              realPricePerHour != nil,
+              pricePerAcre != nil,
+              realPricePerAcre != nil else {
             alertMessage = "Please enter valid prices"
             showingAlert = true
             return
@@ -526,10 +539,10 @@ struct AddEquipmentView: View {
                     capacity: capacity,
                     availabilityStartDate: dateFormatter.string(from: availabilityStartDate),
                     availabilityEndDate: dateFormatter.string(from: availabilityEndDate),
-                    pricePerHour: pricePerHour,
-                    realPricePerHour: realPricePerHour,
-                    pricePerAcre: pricePerAcre,
-                    realPricePerAcre: realPricePerAcre,
+                    pricePerHour: pricePerHour!,
+                    realPricePerHour: realPricePerHour!,
+                    pricePerAcre: pricePerAcre!,
+                    realPricePerAcre: realPricePerAcre!,
                     providerID: currentUser.id,
                     rating: rating,
                     location: location,
@@ -582,7 +595,11 @@ struct AddEquipmentView: View {
         }
     }
     
-    private func validatePricePerHour(_ price: Double) {
+    private func validatePricePerHour(_ price: Double?) {
+        guard let price = price else {
+            pricePerHourError = nil
+            return
+        }
         // Price per hour must be between 10 and 10,000
         if price < 10 {
             pricePerHourError = "Price per hour must be at least ₨10"
@@ -593,7 +610,11 @@ struct AddEquipmentView: View {
         }
     }
     
-    private func validateRealPricePerHour(_ price: Double) {
+    private func validateRealPricePerHour(_ price: Double?) {
+        guard let price = price else {
+            realPricePerHourError = nil
+            return
+        }
         // Real price per hour must be between 10 and 10,000
         if price < 10 {
             realPricePerHourError = "Real price per hour must be at least ₨10"
@@ -604,7 +625,11 @@ struct AddEquipmentView: View {
         }
     }
     
-    private func validatePricePerAcre(_ price: Double) {
+    private func validatePricePerAcre(_ price: Double?) {
+        guard let price = price else {
+            pricePerAcreError = nil
+            return
+        }
         // Price per acre must be between 100 and 50,000
         if price < 100 {
             pricePerAcreError = "Price per acre must be at least ₨100"
@@ -615,7 +640,11 @@ struct AddEquipmentView: View {
         }
     }
     
-    private func validateRealPricePerAcre(_ price: Double) {
+    private func validateRealPricePerAcre(_ price: Double?) {
+        guard let price = price else {
+            realPricePerAcreError = nil
+            return
+        }
         // Real price per acre must be between 100 and 50,000
         if price < 100 {
             realPricePerAcreError = "Real price per acre must be at least ₨100"
