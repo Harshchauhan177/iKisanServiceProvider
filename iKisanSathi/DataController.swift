@@ -1199,19 +1199,19 @@ class DataController: ObservableObject {
         
         // Get all equipment IDs for this producer
         let equipmentIds = producerEquipment.compactMap { $0.equipmentID.uuidString }
-        print("fetchBookings: Equipment IDs: \(equipmentIds)") // Added print statement
+        print("fetchBookings: Equipment IDs: \(equipmentIds)")
         
         if !equipmentIds.isEmpty {
             let response = try await supabase.database
                 .from("bookings")
                 .select()
-                // Corrected column name here
-                .in("equipmentID", values: equipmentIds) 
+                .in("equipmentID", values: equipmentIds)
+                .eq("status", value: "Pending")  // Only fetch pending bookings
                 .execute()
             
             do {
                 let bookings = try JSONDecoder().decode([Booking].self, from: response.data)
-                print("fetchBookings: Fetched \(bookings.count) bookings")
+                print("fetchBookings: Fetched \(bookings.count) pending bookings")
                 DispatchQueue.main.async {
                     self.producerBookings = bookings
                 }
