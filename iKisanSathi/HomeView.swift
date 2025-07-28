@@ -387,6 +387,9 @@ struct HomeView: View {
                 }
                 .padding(.top, 8)
             }
+            .refreshable {
+                await refreshHomeData()
+            }
             .background(Color(.systemGroupedBackground))
             .navigationTitle("Welcome" + (dataController.currentProducer?.name != nil ? ", \(dataController.currentProducer!.name)" : ""))
             .navigationBarTitleDisplayMode(.large)
@@ -437,6 +440,14 @@ struct HomeView: View {
                 }
             }
             .navigationBarBackButtonHidden(false)
+        }
+    }
+    
+    private func refreshHomeData() async {
+        do {
+            try await dataController.refreshAllData()
+        } catch {
+            print("Error refreshing home data: \(error)")
         }
     }
 }

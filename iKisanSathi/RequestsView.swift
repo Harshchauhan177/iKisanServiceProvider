@@ -75,6 +75,9 @@ struct RequestsView: View {
                         }
                         .padding(.vertical)
                     }
+                    .refreshable {
+                        await refreshData()
+                    }
                 }
             }
         }
@@ -82,13 +85,25 @@ struct RequestsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task {
             isLoading = true
-            do {
-                try await dataController.fetchProducerEquipmentAndRequests()
-                try await dataController.fetchBookings()
-            } catch {
-                print("Error fetching data: \(error)")
-            }
+            await loadData()
             isLoading = false
+        }
+    }
+    
+    private func loadData() async {
+        do {
+            try await dataController.fetchProducerEquipmentAndRequests()
+            try await dataController.fetchBookings()
+        } catch {
+            print("Error fetching data: \(error)")
+        }
+    }
+    
+    private func refreshData() async {
+        do {
+            try await dataController.refreshAllData()
+        } catch {
+            print("Error refreshing data: \(error)")
         }
     }
 }
@@ -98,10 +113,14 @@ struct RequestRow: View {
     let equipment: DataController.Equipment?
     @EnvironmentObject var dataController: DataController
     @State private var isPressed = false
-    @State private var isLoading = false
     @State private var showError = false
     @State private var errorMessage = ""
     @State private var showingEditSheet = false
+    
+    // Check if this request is being processed
+    private var isProcessing: Bool {
+        dataController.processingRequests.contains(request.id)
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -188,15 +207,22 @@ struct RequestRow: View {
                         }
                     }) {
                         HStack {
-                            Image(systemName: "checkmark.circle.fill")
-                            Text("Accept")
+                            if isProcessing {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    .scaleEffect(0.8)
+                            } else {
+                                Image(systemName: "checkmark.circle.fill")
+                            }
+                            Text(isProcessing ? "Processing..." : "Accept")
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
-                        .background(Color.green)
+                        .background(isProcessing ? Color.gray : Color.green)
                         .foregroundColor(.white)
                         .cornerRadius(10)
                     }
+                    .disabled(isProcessing)
                     
                     Button(action: {
                         Task {
@@ -204,15 +230,22 @@ struct RequestRow: View {
                         }
                     }) {
                         HStack {
-                            Image(systemName: "trash.fill")
-                            Text("Delete")
+                            if isProcessing {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    .scaleEffect(0.8)
+                            } else {
+                                Image(systemName: "trash.fill")
+                            }
+                            Text(isProcessing ? "Processing..." : "Delete")
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
-                        .background(Color.red)
+                        .background(isProcessing ? Color.gray : Color.red)
                         .foregroundColor(.white)
                         .cornerRadius(10)
                     }
+                    .disabled(isProcessing)
                 }
                 .font(.subheadline.bold())
             }
@@ -222,10 +255,9 @@ struct RequestRow: View {
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 2)
         .overlay(Group {
-            if isLoading {
-                Color.black.opacity(0.3)
-                ProgressView()
-                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+            if isProcessing {
+                Color.black.opacity(0.1)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
             }
         })
         .alert("Error", isPresented: $showError) {
@@ -243,41 +275,37 @@ struct RequestRow: View {
     }
     
     private func handleAcceptRequest() async {
-        isLoading = true
         do {
             try await dataController.acceptRequest(request)
-            isLoading = false
         } catch {
-            isLoading = false
             errorMessage = error.localizedDescription
             showError = true
         }
     }
     
     private func handleDeleteRequest() async {
-        isLoading = true
         do {
             try await dataController.deleteRequest(request)
-            isLoading = false
         } catch {
-            isLoading = false
             errorMessage = error.localizedDescription
             showError = true
         }
     }
 }
 
-
 struct BookingRow: View {
     let booking: Booking
     let equipment: DataController.Equipment?
     @EnvironmentObject var dataController: DataController
-    @State private var isLoading = false
     @State private var isPressed = false
     @State private var showError = false
     @State private var errorMessage = ""
     @State private var showingEditSheet = false
-
+    
+    // Check if this booking is being processed
+    private var isProcessing: Bool {
+        dataController.processingBookings.contains(booking.id)
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -355,16 +383,22 @@ struct BookingRow: View {
                         }
                     }) {
                         HStack {
-                            Image(systemName: "checkmark.circle.fill")
-                            Text("Accept")
+                            if isProcessing {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    .scaleEffect(0.8)
+                            } else {
+                                Image(systemName: "checkmark.circle.fill")
+                            }
+                            Text(isProcessing ? "Processing..." : "Accept")
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
-                        .background(Color.green)
+                        .background(isProcessing ? Color.gray : Color.green)
                         .foregroundColor(.white)
                         .cornerRadius(10)
                     }
-                    
+                    .disabled(isProcessing)
                     
                     Button(action: {
                         Task {
@@ -372,16 +406,22 @@ struct BookingRow: View {
                         }
                     }) {
                         HStack {
-                            Image(systemName: "trash.fill")
-                            Text("Delete")
+                            if isProcessing {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    .scaleEffect(0.8)
+                            } else {
+                                Image(systemName: "trash.fill")
+                            }
+                            Text(isProcessing ? "Processing..." : "Delete")
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
-                        .background(Color.red)
+                        .background(isProcessing ? Color.gray : Color.red)
                         .foregroundColor(.white)
                         .cornerRadius(10)
                     }
-                    
+                    .disabled(isProcessing)
                 }
                 .font(.subheadline.bold())
             }
@@ -391,10 +431,9 @@ struct BookingRow: View {
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 2)
         .overlay(Group {
-            if isLoading {
-                Color.black.opacity(0.3)
-                ProgressView()
-                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+            if isProcessing {
+                Color.black.opacity(0.1)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
             }
         })
         .alert("Error", isPresented: $showError) {
@@ -412,24 +451,18 @@ struct BookingRow: View {
     }
     
     private func handleAcceptBooking() async {
-        isLoading = true
         do {
             try await dataController.acceptBookingTapped(booking)
-            isLoading = false
         } catch {
-            isLoading = false
             errorMessage = error.localizedDescription
             showError = true
         }
     }
     
     private func handleDeleteBooking() async {
-        isLoading = true
         do {
             try await dataController.deleteBooking(booking)
-            isLoading = false
         } catch {
-            isLoading = false
             errorMessage = error.localizedDescription
             showError = true
         }
