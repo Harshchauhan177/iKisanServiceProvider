@@ -335,7 +335,9 @@ struct HomeView: View {
                                                                 .foregroundColor(.secondary)
                                                         }
                                                     }
+                                                    Spacer()
                                                 }
+                                                .frame(maxWidth: .infinity)
                                                 
                                                 HStack(spacing: 16) {
                                                     // Date
@@ -347,6 +349,8 @@ struct HomeView: View {
                                                             .font(.subheadline)
                                                             .foregroundColor(.primary)
                                                     }
+                                                    
+                                                    Spacer()
                                                     
                                                     // Time
                                                     HStack(spacing: 8) {
@@ -371,6 +375,7 @@ struct HomeView: View {
                                                 }
                                             }
                                             .padding(16)
+                                            .frame(width: UIScreen.main.bounds.width - 32) // Match Add Equipment card width
                                             .background(Color(.systemBackground))
                                             .cornerRadius(16)
                                             .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
