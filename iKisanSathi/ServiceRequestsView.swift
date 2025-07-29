@@ -37,6 +37,9 @@ struct ServiceRequestsView: View {
                     .padding(.horizontal) // Move horizontal padding here
                     .padding(.vertical)
                 }
+                .refreshable {
+                    await refreshData()
+                }
             }
         }
         .background(Color(.systemGray6).ignoresSafeArea())
@@ -50,6 +53,14 @@ struct ServiceRequestsView: View {
                 print("Error fetching service requests: \(error)")
             }
             isLoading = false
+        }
+    }
+    
+    private func refreshData() async {
+        do {
+            try await dataController.refreshAllData()
+        } catch {
+            print("Error refreshing service requests: \(error)")
         }
     }
 }

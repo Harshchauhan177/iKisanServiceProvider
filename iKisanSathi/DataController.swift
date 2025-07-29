@@ -30,6 +30,10 @@ enum AuthError: Error, LocalizedError {
 class DataController: ObservableObject {
     @Published var producerBookings: [Booking] = []
     
+    // Add processing state tracking to prevent multiple taps
+    @Published var processingRequests: Set<UUID> = []
+    @Published var processingBookings: Set<UUID> = []
+    
     // Shared URLSession for all network requests
     private static let sharedSession: URLSession = {
         let config = URLSessionConfiguration.default
@@ -549,6 +553,11 @@ class DataController: ObservableObject {
     }
     
     func deleteRequest(_ request: Request) async throws {
+        // Add to processing state immediately
+        DispatchQueue.main.async {
+            self.processingRequests.insert(request.id)
+        }
+        
         // Delete the request from Supabase
         try await supabase.database
             .from("requests")
@@ -556,13 +565,25 @@ class DataController: ObservableObject {
             .eq("id", value: request.id)
             .execute()
         
-        // Update local state
+        // Update local state immediately after successful deletion
         DispatchQueue.main.async {
             self.producerRequests.removeAll { $0.id == request.id }
+            self.processingRequests.remove(request.id)
         }
     }
     
     func acceptRequest(_ request: Request) async throws {
+        // Prevent multiple taps by checking if already processing
+        guard !processingRequests.contains(request.id) else {
+            print("⚠️ Request \(request.id) is already being processed")
+            return
+        }
+        
+        // Add to processing state immediately
+        DispatchQueue.main.async {
+            self.processingRequests.insert(request.id)
+        }
+        
         print("🔄 Accepting request with ID: \(request.id)")
         
         // Calculate amount based on area and equipment rates
@@ -595,12 +616,25 @@ class DataController: ObservableObject {
         
         print("✅ Successfully inserted service request")
         
-        print("🗑️ Deleting original request")
-        // Delete from requests table
-        try await deleteRequest(request)
+        // UPDATE: Instead of deleting, update the status to "Confirmed"
+        print("🔄 Updating request status to Confirmed")
+        try await supabase.database
+            .from("requests")
+            .update(["status": "Confirmed"])
+            .eq("id", value: request.id)
+            .execute()
+        
+        print("✅ Successfully updated request status to Confirmed")
+        
+        // Remove from local state immediately (only for producer app UI)
+        DispatchQueue.main.async {
+            self.producerRequests.removeAll { $0.id == request.id }
+            self.serviceRequests.append(serviceRequest)
+            self.processingRequests.remove(request.id)
+        }
         
         print("🔄 Refreshing service requests list")
-        // Refresh service requests
+        // Refresh service requests to ensure consistency
         try await fetchServiceRequests()
     }
     
@@ -1165,19 +1199,19 @@ class DataController: ObservableObject {
         
         // Get all equipment IDs for this producer
         let equipmentIds = producerEquipment.compactMap { $0.equipmentID.uuidString }
-        print("fetchBookings: Equipment IDs: \(equipmentIds)") // Added print statement
+        print("fetchBookings: Equipment IDs: \(equipmentIds)")
         
         if !equipmentIds.isEmpty {
             let response = try await supabase.database
                 .from("bookings")
                 .select()
-                // Corrected column name here
-                .in("equipmentID", values: equipmentIds) 
+                .in("equipmentID", values: equipmentIds)
+                .eq("status", value: "Pending")  // Only fetch pending bookings
                 .execute()
             
             do {
                 let bookings = try JSONDecoder().decode([Booking].self, from: response.data)
-                print("fetchBookings: Fetched \(bookings.count) bookings")
+                print("fetchBookings: Fetched \(bookings.count) pending bookings")
                 DispatchQueue.main.async {
                     self.producerBookings = bookings
                 }
@@ -1199,7 +1233,18 @@ class DataController: ObservableObject {
         }
     }
     func acceptBookingTapped(_ booking: Booking) async throws {
-        print("🔄 Accepting request with ID: \(booking.id)")
+        // Prevent multiple taps by checking if already processing
+        guard !processingBookings.contains(booking.id) else {
+            print("⚠️ Booking \(booking.id) is already being processed")
+            return
+        }
+        
+        // Add to processing state immediately
+        DispatchQueue.main.async {
+            self.processingBookings.insert(booking.id)
+        }
+        
+        print("🔄 Accepting booking with ID: \(booking.id)")
         let equipment = equipmentDetails[booking.equipmentId ?? UUID()]
         let amount = (equipment?.pricePerAcre ?? 0.0) * booking.fieldArea
         print("💰 Calculated amount: \(amount) based on area: \(booking.fieldArea)")
@@ -1229,15 +1274,33 @@ class DataController: ObservableObject {
         
         print("✅ Successfully inserted service request")
         
-        print("🗑️ Deleting original request")
-        // Delete from requests table
-        try await deleteBookings(booking)
+        // UPDATE: Instead of deleting, update the status to "Confirmed"
+        print("🔄 Updating booking status to Confirmed")
+        try await supabase.database
+            .from("bookings")
+            .update(["status": "Confirmed"])
+            .eq("bookingID", value: booking.id)
+            .execute()
+        
+        print("✅ Successfully updated booking status to Confirmed")
+        
+        // Remove from local state immediately (only for producer app UI)
+        DispatchQueue.main.async {
+            self.producerBookings.removeAll { $0.id == booking.id }
+            self.serviceRequests.append(serviceRequest)
+            self.processingBookings.remove(booking.id)
+        }
         
         print("🔄 Refreshing service requests list")
-        // Refresh service requests
+        // Refresh service requests to ensure consistency
         try await fetchServiceRequests()
     }
     func deleteBookings(_ booking: Booking) async throws {
+        // Add to processing state immediately
+        DispatchQueue.main.async {
+            self.processingBookings.insert(booking.id)
+        }
+        
         // Delete the request from Supabase
         try await supabase.database
             .from("bookings")
@@ -1245,9 +1308,10 @@ class DataController: ObservableObject {
             .eq("bookingID", value: booking.id)
             .execute()
         
-        // Update local state
+        // Update local state immediately
         DispatchQueue.main.async {
-            self.producerRequests.removeAll { $0.id == booking.id }
+            self.producerBookings.removeAll { $0.id == booking.id }
+            self.processingBookings.remove(booking.id)
         }
     }
 
@@ -1337,5 +1401,26 @@ class DataController: ObservableObject {
     // Provide access to the database without exposing the private supabase property
     func getDatabase() -> PostgrestClient {
         return supabase.database
+    }
+    
+    // Add refresh functionality for all main data
+    func refreshAllData() async throws {
+        await withThrowingTaskGroup(of: Void.self) { group in
+            group.addTask {
+                try await self.fetchProducerEquipmentAndRequests()
+            }
+            group.addTask {
+                try await self.fetchBookings()
+            }
+            group.addTask {
+                try await self.fetchServiceRequests()
+            }
+            group.addTask {
+                try await self.fetchCompletedServiceRequests()
+            }
+            group.addTask {
+                try await self.fetchMonthlyIncome()
+            }
+        }
     }
 }

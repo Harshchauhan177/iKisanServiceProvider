@@ -24,6 +24,9 @@ struct HistoryView: View {
                                 }
                             }
                         }
+                        .refreshable {
+                            await refreshHistoryData()
+                        }
                     }
                 }
             }
@@ -37,4 +40,12 @@ struct HistoryView: View {
             }
         }
     }
-} 
+    
+    private func refreshHistoryData() async {
+        do {
+            try await dataController.refreshAllData()
+        } catch {
+            print("Error refreshing history data: \(error)")
+        }
+    }
+}
