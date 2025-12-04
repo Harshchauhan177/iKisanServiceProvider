@@ -16,6 +16,7 @@ struct AddEquipmentView: View {
     @State private var realPricePerHour: Double? = nil
     @State private var pricePerAcre: Double? = nil
     @State private var realPricePerAcre: Double? = nil
+    @State private var isDiscountEnabled = false // Toggle for discount pricing
     @State private var rating = 5.0
     @State private var location = ""
     @State private var selectedLatitude: Double?
@@ -293,6 +294,46 @@ struct AddEquipmentView: View {
     
     private var pricingSection: some View {
         Section(header: Text("Pricing")) {
+            // Toggle for enabling discount pricing
+            Toggle("Provide Discount", isOn: $isDiscountEnabled)
+                .onChange(of: isDiscountEnabled) { newValue in
+                    // Clear discount prices when toggle is turned off
+                    if !newValue {
+                        realPricePerHour = nil
+                        realPricePerHourError = nil
+                        realPricePerAcre = nil
+                        realPricePerAcreError = nil
+                    }
+                }
+            
+            // Show Real Price per Hour only when discount is enabled
+            if isDiscountEnabled {
+                VStack(alignment: .leading) {
+                    HStack {
+                        Text("₨")
+                            .foregroundColor(.secondary)
+                            .font(.headline)
+                        TextField("Real Price per Hour", value: $realPricePerHour, format: .number)
+                            .keyboardType(.decimalPad)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                    }
+                    .onChange(of: realPricePerHour) { newValue in
+                        validateRealPricePerHour(newValue)
+                    }
+                    if let error = realPricePerHourError {
+                        Text(error)
+                            .foregroundColor(.red)
+                            .font(.caption)
+                            .padding(.top, 2)
+                    } else {
+                        Text("Minimum: ₨10, Maximum: ₨10,000")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            
+            // Price per Hour (always visible)
             VStack(alignment: .leading) {
                 HStack {
                     Text("₨")
@@ -317,30 +358,34 @@ struct AddEquipmentView: View {
                 }
             }
             
-            VStack(alignment: .leading) {
-                HStack {
-                    Text("₨")
-                        .foregroundColor(.secondary)
-                        .font(.headline)
-                    TextField("Real Price per Hour", value: $realPricePerHour, format: .number)
-                        .keyboardType(.decimalPad)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                }
-                .onChange(of: realPricePerHour) { newValue in
-                    validateRealPricePerHour(newValue)
-                }
-                if let error = realPricePerHourError {
-                    Text(error)
-                        .foregroundColor(.red)
-                        .font(.caption)
-                        .padding(.top, 2)
-                } else {
-                    Text("Minimum: ₨10, Maximum: ₨10,000")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
+            // Show Real Price per Acre only when discount is enabled
+            if isDiscountEnabled {
+                VStack(alignment: .leading) {
+                    HStack {
+                        Text("₨")
+                            .foregroundColor(.secondary)
+                            .font(.headline)
+                        TextField("Real Price per Acre", value: $realPricePerAcre, format: .number)
+                            .keyboardType(.decimalPad)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                    }
+                    .onChange(of: realPricePerAcre) { newValue in
+                        validateRealPricePerAcre(newValue)
+                    }
+                    if let error = realPricePerAcreError {
+                        Text(error)
+                            .foregroundColor(.red)
+                            .font(.caption)
+                            .padding(.top, 2)
+                    } else {
+                        Text("Minimum: ₨100, Maximum: ₨50,000")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
                 }
             }
             
+            // Price per Acre (always visible)
             VStack(alignment: .leading) {
                 HStack {
                     Text("₨")
@@ -364,56 +409,19 @@ struct AddEquipmentView: View {
                         .foregroundColor(.secondary)
                 }
             }
-            
-            VStack(alignment: .leading) {
-                HStack {
-                    Text("₨")
-                        .foregroundColor(.secondary)
-                        .font(.headline)
-                    TextField("Real Price per Acre", value: $realPricePerAcre, format: .number)
-                        .keyboardType(.decimalPad)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                }
-                .onChange(of: realPricePerAcre) { newValue in
-                    validateRealPricePerAcre(newValue)
-                }
-                if let error = realPricePerAcreError {
-                    Text(error)
-                        .foregroundColor(.red)
-                        .font(.caption)
-                        .padding(.top, 2)
-                } else {
-                    Text("Minimum: ₨100, Maximum: ₨50,000")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                }
-            }
         }
     }
     
     private var equipmentDetailsSection: some View {
         Section(header: Text("Equipment Details")) {
-            TextField("Model Year", text: $modelYear)
-                .keyboardType(.numberPad)
-                .onChange(of: modelYear) { newValue in
-                    // Filter to keep only numeric characters
-                    let filtered = newValue.filter { $0.isNumber }
-                    
-                    // Limit to 4 digits and validate year range
-                    if filtered.count <= 4 {
-                        if let year = Int(filtered), year >= minYear && year <= currentYear {
-                            modelYear = filtered
-                        } else if filtered.isEmpty {
-                            modelYear = ""
-                        } else if filtered.count == 4 {
-                            // Invalid year range, clear the field
-                            modelYear = ""
-                        } else {
-                            // Allow partial entry while typing
-                            modelYear = filtered
-                        }
-                    }
+            Picker("Model Year", selection: $modelYear) {
+                Text("Select Year").tag("")
+                ForEach((minYear...currentYear).reversed(), id: \.self) { year in
+                    Text(String(year)).tag(String(year))
                 }
+            }
+            .pickerStyle(MenuPickerStyle())
+            
             TextField("Mileage", text: $mielage)
                 .onChange(of: mielage) { newValue in
                     // Validate mileage length
@@ -474,14 +482,22 @@ struct AddEquipmentView: View {
             return
         }
         
-        // Price Validation
+        // Price Validation - Base prices are always required
         guard pricePerHour != nil,
-              realPricePerHour != nil,
-              pricePerAcre != nil,
-              realPricePerAcre != nil else {
+              pricePerAcre != nil else {
             alertMessage = "Please enter valid prices"
             showingAlert = true
             return
+        }
+        
+        // If discount is enabled, validate discount prices
+        if isDiscountEnabled {
+            guard realPricePerHour != nil,
+                  realPricePerAcre != nil else {
+                alertMessage = "Please enter valid discount prices"
+                showingAlert = true
+                return
+            }
         }
         
         // Location Validation
@@ -531,6 +547,10 @@ struct AddEquipmentView: View {
                 
                 let equipmentID = UUID()
                 
+                // If discount is not enabled, use base price as real price
+                let finalRealPricePerHour = isDiscountEnabled ? realPricePerHour! : pricePerHour!
+                let finalRealPricePerAcre = isDiscountEnabled ? realPricePerAcre! : pricePerAcre!
+                
                 let equipment = DataController.Equipment(
                     equipmentID: equipmentID,
                     equipmentImage: imageUrls.first!, // Use first image as main image
@@ -540,9 +560,9 @@ struct AddEquipmentView: View {
                     availabilityStartDate: dateFormatter.string(from: availabilityStartDate),
                     availabilityEndDate: dateFormatter.string(from: availabilityEndDate),
                     pricePerHour: pricePerHour!,
-                    realPricePerHour: realPricePerHour!,
+                    realPricePerHour: finalRealPricePerHour,
                     pricePerAcre: pricePerAcre!,
-                    realPricePerAcre: realPricePerAcre!,
+                    realPricePerAcre: finalRealPricePerAcre,
                     providerID: currentUser.id,
                     rating: rating,
                     location: location,
