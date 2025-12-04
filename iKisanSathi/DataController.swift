@@ -412,6 +412,92 @@ class DataController: ObservableObject {
         print("✅ Sign out complete")
     }
     
+    // MARK: - Forgot Password Methods
+    
+    func sendPasswordResetOTP(email: String) async throws {
+        print("📧 Sending password reset OTP to: \(email)")
+        
+        // First, verify that this email exists in the producer table
+        print("🔍 Checking if email exists in producer table...")
+        let response = try await supabase.database
+            .from("producer")
+            .select("email")
+            .eq("email", value: email)
+            .execute()
+        
+        let producers = try JSONDecoder().decode([ProducerEmailCheck].self, from: response.data)
+        
+        guard !producers.isEmpty else {
+            print("❌ Email not found in producer table")
+            throw NSError(
+                domain: "DataController",
+                code: 404,
+                userInfo: [NSLocalizedDescriptionKey: "No account found with this email address. Please check your email or sign up for a new account."]
+            )
+        }
+        
+        print("✅ Email verified in producer table")
+        
+        // Store email for later verification
+        tempEmail = email
+        
+        // Send OTP via Supabase Auth
+        try await supabase.auth.resetPasswordForEmail(email)
+        
+        DispatchQueue.main.async {
+            self.isOTPSent = true
+            self.tempEmail = email
+        }
+        
+        print("✅ Password reset OTP sent successfully")
+    }
+    
+    // Helper struct for email verification
+    private struct ProducerEmailCheck: Codable {
+        let email: String
+    }
+    
+    func verifyPasswordResetOTP(otp: String) async throws {
+        guard let email = tempEmail else { 
+            throw AuthError.invalidEmail 
+        }
+        
+        print("🔐 Verifying password reset OTP...")
+        
+        // Verify OTP with Supabase
+        try await supabase.auth.verifyOTP(
+            email: email,
+            token: otp,
+            type: .recovery
+        )
+        
+        DispatchQueue.main.async {
+            self.isOTPVerified = true
+        }
+        
+        print("✅ OTP verified successfully")
+    }
+    
+    func resetPassword(newPassword: String) async throws {
+        guard isOTPVerified else { 
+            throw AuthError.otpNotVerified 
+        }
+        
+        print("🔑 Resetting password...")
+        
+        // Update password via Supabase
+        try await supabase.auth.update(user: UserAttributes(password: newPassword))
+        
+        // Clear temp data
+        DispatchQueue.main.async {
+            self.isOTPVerified = false
+            self.isOTPSent = false
+            self.tempEmail = nil
+        }
+        
+        print("✅ Password reset successfully")
+    }
+    
     func checkSession() async {
         print("🔐 Checking session...")
         if let session = supabase.auth.currentSession {

@@ -6,6 +6,7 @@ struct LoginView: View {
     @State private var email = ""
     @State private var password = ""
     @State private var showingSignUp = false
+    @State private var showingForgotPassword = false
     @State private var showingAlert = false
     @State private var alertMessage = ""
     @State private var isLoading = false
@@ -30,6 +31,17 @@ struct LoginView: View {
                         
                         SecureField("Password", text: $password)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
+                        
+                        // Forgot Password Button
+                        HStack {
+                            Spacer()
+                            Button(action: { showingForgotPassword = true }) {
+                                Text("Forgot Password?")
+                                    .font(.subheadline)
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                        .padding(.top, -10)
                         
                         Button(action: login) {
                             Text("Login")
@@ -85,6 +97,10 @@ struct LoginView: View {
         }
         .sheet(isPresented: $appleVM.showProfileCompletion) {
             ProfileCompletionView(userEmail: appleVM.pendingUserEmail, viewModel: appleVM)
+        }
+        .sheet(isPresented: $showingForgotPassword) {
+            ForgotPasswordView()
+                .environmentObject(dataController)
         }
         .onChange(of: appleVM.navigateToHome) { navigateToHome in
             if navigateToHome && appleVM.isAuthenticated {
