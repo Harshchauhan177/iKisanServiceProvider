@@ -154,34 +154,78 @@ class LocationManager: NSObject, ObservableObject {
     // User location (if available)
     @Published var userLocation: CLLocation?
     
+    // Authorization status
+    @Published var authorizationStatus: CLAuthorizationStatus = .notDetermined
+    
+    // Location update status
+    @Published var isUpdatingLocation = false
+    @Published var locationError: String?
+    
     private let locationManager = CLLocationManager()
     
     private override init() {
         super.init()
         locationManager.delegate = self
         locationManager.desiredAccuracy = kCLLocationAccuracyBest
-        locationManager.requestWhenInUseAuthorization()
-        locationManager.startUpdatingLocation()
+        locationManager.distanceFilter = 10 // Only update when user moves 10 meters
+        
+        // Set initial authorization status
+        authorizationStatus = locationManager.authorizationStatus
     }
     
     // Public method to request location permissions
     func requestLocationPermission() {
-        locationManager.requestWhenInUseAuthorization()
+        let status = locationManager.authorizationStatus
+        
+        switch status {
+        case .notDetermined:
+            locationManager.requestWhenInUseAuthorization()
+        case .denied, .restricted:
+            locationError = "Location access is denied. Please enable it in Settings."
+        case .authorizedWhenInUse, .authorizedAlways:
+            startLocationUpdates()
+        @unknown default:
+            break
+        }
     }
     
     // Public method to start location updates
     func startLocationUpdates() {
-        guard locationManager.authorizationStatus == .authorizedWhenInUse || 
-              locationManager.authorizationStatus == .authorizedAlways else {
+        let status = locationManager.authorizationStatus
+        
+        guard status == .authorizedWhenInUse || status == .authorizedAlways else {
             requestLocationPermission()
             return
         }
+        
+        isUpdatingLocation = true
+        locationError = nil
         locationManager.startUpdatingLocation()
+        
+        // Stop updating after 10 seconds to save battery
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10) { [weak self] in
+            self?.stopLocationUpdates()
+        }
     }
     
-    // Public method to check authorization status
-    var authorizationStatus: CLAuthorizationStatus {
-        return locationManager.authorizationStatus
+    // Stop location updates
+    func stopLocationUpdates() {
+        locationManager.stopUpdatingLocation()
+        isUpdatingLocation = false
+    }
+    
+    // Request one-time location
+    func requestLocation() {
+        let status = locationManager.authorizationStatus
+        
+        guard status == .authorizedWhenInUse || status == .authorizedAlways else {
+            requestLocationPermission()
+            return
+        }
+        
+        isUpdatingLocation = true
+        locationError = nil
+        locationManager.requestLocation()
     }
 }
 
@@ -190,12 +234,45 @@ extension LocationManager: CLLocationManagerDelegate {
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         // Store the most recent user location
         if let location = locations.last {
-            userLocation = location
+            DispatchQueue.main.async { [weak self] in
+                self?.userLocation = location
+                self?.isUpdatingLocation = false
+                self?.locationError = nil
+            }
         }
     }
     
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        print("Location manager error: \(error.localizedDescription)")
+        DispatchQueue.main.async { [weak self] in
+            self?.isUpdatingLocation = false
+            
+            if let clError = error as? CLError {
+                switch clError.code {
+                case .denied:
+                    self?.locationError = "Location access denied. Enable in Settings."
+                case .locationUnknown:
+                    self?.locationError = "Unable to determine location. Try again."
+                default:
+                    self?.locationError = "Location error: \(error.localizedDescription)"
+                }
+            } else {
+                self?.locationError = "Location error: \(error.localizedDescription)"
+            }
+            
+            print("Location manager error: \(error.localizedDescription)")
+        }
+    }
+    
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        DispatchQueue.main.async { [weak self] in
+            self?.authorizationStatus = manager.authorizationStatus
+            
+            // If authorized, start updating location
+            if manager.authorizationStatus == .authorizedWhenInUse ||
+               manager.authorizationStatus == .authorizedAlways {
+                self?.startLocationUpdates()
+            }
+        }
     }
 }
 
@@ -216,6 +293,8 @@ struct BookingLocationPickerView: View {
     @State private var pinLocation: CLLocationCoordinate2D?
     @State private var isSearching = false
     @State private var isSearchFieldFocused = false
+    @State private var showLocationError = false
+    @State private var showSettingsAlert = false
     
     // Debounce search for better performance
     @State private var searchDebounceTask: DispatchWorkItem?
@@ -289,9 +368,13 @@ struct BookingLocationPickerView: View {
             VStack(spacing: 0) {
                 // Search bar at the top
                 searchBarView
-                    .padding(.horizontal)
+                    .padding(.horizontal, 16)
                     .padding(.top, 8)
-                    .background(Color(.systemBackground).opacity(0.95))
+                    .background(
+                        Color(.systemBackground)
+                            .opacity(0.95)
+                            .shadow(color: Color.black.opacity(0.1), radius: 2, y: 2)
+                    )
                     .zIndex(100) // Keep search on top
                 
                 // Search results below search bar
@@ -303,41 +386,72 @@ struct BookingLocationPickerView: View {
                 Spacer()
                 
                 // Controls at bottom
-                VStack(spacing: 16) {
+                VStack(spacing: 12) {
                     // Selected address display
                     addressBar
                     
-                    // My location button
+                    // My location button with loading state
                     Button(action: {
                         useCurrentLocation()
                     }) {
-                        HStack {
-                            Image(systemName: "location.fill")
-                            Text("Use My Location")
+                        HStack(spacing: 8) {
+                            if locationManager.isUpdatingLocation {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    .scaleEffect(0.9)
+                            } else {
+                                Image(systemName: "location.fill")
+                                    .font(.system(size: 16, weight: .semibold))
+                            }
+                            Text(locationManager.isUpdatingLocation ? "Getting Location..." : "Use My Location")
+                                .font(.system(size: 16, weight: .semibold))
                         }
-                        .padding(.vertical, 12)
-                        .padding(.horizontal, 16)
-                        .background(ikisanGreen)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(
+                            locationManager.isUpdatingLocation ? 
+                                ikisanGreen.opacity(0.7) : ikisanGreen
+                        )
                         .foregroundColor(.white)
-                        .cornerRadius(8)
+                        .cornerRadius(12)
+                        .shadow(color: ikisanGreen.opacity(0.3), radius: 4, y: 2)
                     }
-                    .padding(.bottom, 16)
+                    .disabled(locationManager.isUpdatingLocation)
+                    .padding(.bottom, 8)
                 }
-                .padding(.horizontal)
-                .background(Color(.systemBackground))
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .background(
+                    Color(.systemBackground)
+                        .shadow(color: Color.black.opacity(0.1), radius: 8, y: -2)
+                )
             }
-            
-            // We don't need a center indicator as we'll use a proper pin
-            // This follows standard Apple Maps behavior where the pin is placed directly
+        }
+        .alert("Location Access Required", isPresented: $showSettingsAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Open Settings") {
+                if let settingsUrl = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(settingsUrl)
+                }
+            }
+        } message: {
+            Text("Please enable location access in Settings to use your current location.")
+        }
+        .alert("Location Error", isPresented: $showLocationError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(locationManager.locationError ?? "Unable to get your location. Please try again.")
         }
         .onTapGesture {
             // Dismiss keyboard when tapping outside search
             if isSearchFieldFocused {
                 isSearchFieldFocused = false
-                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),
-                                               to: nil,
-                                               from: nil,
-                                               for: nil)
+                hideKeyboard()
+            }
+        }
+        .onChange(of: locationManager.locationError) { error in
+            if error != nil {
+                showLocationError = true
             }
         }
     }
@@ -347,17 +461,18 @@ struct BookingLocationPickerView: View {
     // Search bar component
     private var searchBarView: some View {
         HStack(spacing: 8) {
-            HStack {
+            HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(.secondary)
-                    .font(.system(size: 17, weight: .medium))
-                    .frame(width: 24, height: 24)
-                    .padding(.leading, 6)
+                    .font(.system(size: 16, weight: .medium))
                 
-                TextField("Search for location", text: $searchText)
+                TextField("Search for a location", text: $searchText)
                     .textFieldStyle(PlainTextFieldStyle())
                     .disableAutocorrection(true)
                     .autocapitalization(.none)
+                    .onTapGesture {
+                        isSearchFieldFocused = true
+                    }
                     .onChange(of: searchText) { newValue in
                         if newValue.isEmpty {
                             // Clear results immediately when text is cleared
@@ -378,123 +493,148 @@ struct BookingLocationPickerView: View {
                     }) {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundColor(.secondary)
-                            .font(.system(size: 17))
-                            .frame(width: 24, height: 24)
+                            .font(.system(size: 16))
                     }
-                    .padding(.trailing, 6)
                     .buttonStyle(BorderlessButtonStyle())
                 }
             }
-            .padding(.vertical, 8)
-            .background(Color(.systemBackground))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(Color(.systemGray6))
             .cornerRadius(10)
-            .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
         }
     }
     
     // Search results list
     private var searchResultsView: some View {
-        VStack {
-            // Background for the results list
-            ZStack {
-                Rectangle()
-                    .fill(Color(.systemBackground))
-                    .shadow(color: Color.black.opacity(0.15), radius: 5, x: 0, y: 5)
-                
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        // Section header
-                        HStack {
-                            Text("Results")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .padding(.horizontal)
-                                .padding(.top, 8)
-                                .padding(.bottom, 4)
-                            Spacer()
-                        }
-                        
-                        // Results list
-                        ForEach(searchResults, id: \.self) { item in
-                            Button(action: {
-                                selectSearchResult(item)
-                            }) {
-                                HStack {
-                                    // Location pin icon
-                                    Image(systemName: "mappin.circle.fill")
-                                        .foregroundColor(ikisanGreen)
-                                        .font(.system(size: 22))
-                                        .frame(width: 30, height: 30)
+        VStack(spacing: 0) {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    // Section header
+                    HStack {
+                        Text("Search Results")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.secondary)
+                            .textCase(.uppercase)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+                    .padding(.bottom, 8)
+                    
+                    // Results list
+                    ForEach(searchResults, id: \.self) { item in
+                        Button(action: {
+                            selectSearchResult(item)
+                        }) {
+                            HStack(spacing: 12) {
+                                // Location pin icon
+                                Image(systemName: "mappin.circle.fill")
+                                    .foregroundColor(ikisanGreen)
+                                    .font(.system(size: 24))
+                                    .frame(width: 32)
+                                
+                                // Address info
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(item.name ?? item.placemark.title ?? "Unknown Location")
+                                        .font(.body)
+                                        .fontWeight(.medium)
+                                        .foregroundColor(.primary)
+                                        .lineLimit(1)
                                     
-                                    // Address info
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(item.name ?? item.placemark.title ?? "Unknown location")
-                                            .font(.subheadline)
-                                            .fontWeight(.medium)
-                                            .foregroundColor(.primary)
-                                            .lineLimit(1)
-                                        
-                                        Text(addressFromPlacemark(item.placemark))
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                            .lineLimit(1)
-                                    }
-                                    
-                                    Spacer()
-                                    
-                                    // Chevron
-                                    Image(systemName: "chevron.right")
-                                        .font(.caption)
+                                    Text(addressFromPlacemark(item.placemark))
+                                        .font(.subheadline)
                                         .foregroundColor(.secondary)
+                                        .lineLimit(2)
                                 }
-                                .padding(.horizontal)
-                                .padding(.vertical, 10)
-                                .contentShape(Rectangle()) // Make entire row tappable
+                                
+                                Spacer()
+                                
+                                // Chevron
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundColor(ikisanGreen)
                             }
-                            .buttonStyle(PlainButtonStyle())
-                            
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            .contentShape(Rectangle()) // Make entire row tappable
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .background(Color(.systemBackground))
+                        
+                        if item != searchResults.last {
                             Divider()
-                                .padding(.leading, 45)
+                                .padding(.leading, 60)
                         }
                     }
                 }
             }
             .frame(maxHeight: 300) // Limit height
-            .padding(.horizontal)
+            .background(Color(.systemBackground))
+            .cornerRadius(12)
+            .shadow(color: Color.black.opacity(0.15), radius: 8, y: 4)
+            .padding(.horizontal, 16)
         }
     }
     
     // Address display bar
     private var addressBar: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Selected Location")
-                .font(.caption)
-                .foregroundColor(.secondary)
-            
+        VStack(alignment: .leading, spacing: 6) {
             HStack {
+                Text("SELECTED LOCATION")
+                    .font(.caption2)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.secondary)
+                
+                Spacer()
+                
+                if isReverseGeocodingInProgress {
+                    ProgressView()
+                        .scaleEffect(0.7)
+                }
+            }
+            
+            HStack(spacing: 12) {
                 Image(systemName: "mappin.circle.fill")
                     .foregroundColor(ikisanGreen)
+                    .font(.system(size: 22))
                 
                 if let address = locationManager.selectedLocation?.address {
                     Text(address)
                         .font(.subheadline)
-                        .lineLimit(2)
+                        .foregroundColor(.primary)
+                        .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else if isReverseGeocodingInProgress {
+                    Text("Getting address...")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
                 } else {
                     Text("Move the map to select a location")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
-                        .lineLimit(2)
                 }
                 
-                Spacer()
+                Spacer(minLength: 0)
             }
-            .padding(12)
-            .background(Color(.systemGray6))
-            .cornerRadius(8)
         }
+        .padding(16)
+        .background(Color(.systemGray6))
+        .cornerRadius(12)
     }
     
     // MARK: - Location Functions
+    
+    // Helper to hide keyboard
+    private func hideKeyboard() {
+        UIApplication.shared.sendAction(
+            #selector(UIResponder.resignFirstResponder),
+            to: nil,
+            from: nil,
+            for: nil
+        )
+    }
     
     // Search for places based on user input with debouncing
     private func searchForPlaces() {
@@ -545,7 +685,7 @@ struct BookingLocationPickerView: View {
         
         // Store and execute with delay
         searchDebounceTask = task
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8, execute: task)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: task)
     }
     
     // Select a search result
@@ -556,7 +696,7 @@ struct BookingLocationPickerView: View {
         let displayName = mapItem.name ?? mapItem.placemark.title ?? addressFromPlacemark(mapItem.placemark)
         
         // Update map region with animation
-        withAnimation {
+        withAnimation(.easeInOut(duration: 0.5)) {
             region = MKCoordinateRegion(
                 center: coordinate,
                 span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
@@ -576,13 +716,14 @@ struct BookingLocationPickerView: View {
             address: address
         )
         
-        // Update UI state but keep the search text
+        // Update UI state
         DispatchQueue.main.async {
             // Update search text to show the selected location name
             searchText = displayName
             // Hide results and keyboard
             isSearchFieldFocused = false
             showSearchResults = false
+            hideKeyboard()
         }
     }
     
@@ -624,37 +765,90 @@ struct BookingLocationPickerView: View {
             
             mapMovementDebounceTask = task
             // Use a longer delay to reduce the number of geocoding requests
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2, execute: task)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8, execute: task)
         }
     }
     
     // Use the user's current location
     private func useCurrentLocation() {
-        if let userLocation = locationManager.userLocation {
-            // We already have user location from the existing locationManager
-            withAnimation {
-                region = MKCoordinateRegion(
-                    center: userLocation.coordinate,
-                    span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
-                )
-            }
+        // Check authorization status
+        let status = locationManager.authorizationStatus
+        
+        switch status {
+        case .notDetermined:
+            // Request permission
+            locationManager.requestLocationPermission()
+            return
             
-            // Set pin at user's location
-            pinLocation = userLocation.coordinate
+        case .denied, .restricted:
+            // Show alert to open settings
+            showSettingsAlert = true
+            return
             
-            // Update selected location
-            updateSelectedLocation(coordinate: userLocation.coordinate)
-        } else {
-            // Use the public methods to request location
-            locationManager.startLocationUpdates()
+        case .authorizedWhenInUse, .authorizedAlways:
+            // We have permission, proceed
+            break
+            
+        @unknown default:
+            break
         }
+        
+        // If we already have user location, use it immediately
+        if let userLocation = locationManager.userLocation {
+            animateToLocation(userLocation.coordinate)
+        } else {
+            // Request a fresh location update
+            locationManager.requestLocation()
+            
+            // Set up a timeout to handle cases where location doesn't come
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [locationManager] in
+                if locationManager.isUpdatingLocation {
+                    locationManager.stopLocationUpdates()
+                    if locationManager.userLocation == nil {
+                        locationManager.locationError = "Unable to determine your location. Please try again."
+                    }
+                }
+            }
+        }
+        
+        // Listen for location updates
+        if locationManager.userLocation == nil {
+            // Create a one-time observation
+            let cancellable = locationManager.$userLocation
+                .compactMap { $0 }
+                .first()
+                .sink { [self] location in
+                    animateToLocation(location.coordinate)
+                }
+            
+            cancellables.insert(cancellable)
+        }
+    }
+    
+    // Helper to animate map to a location
+    private func animateToLocation(_ coordinate: CLLocationCoordinate2D) {
+        withAnimation(.easeInOut(duration: 0.5)) {
+            region = MKCoordinateRegion(
+                center: coordinate,
+                span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+            )
+        }
+        
+        // Set pin at user's location
+        pinLocation = coordinate
+        
+        // Update selected location
+        updateSelectedLocation(coordinate: coordinate)
     }
     
     // Reverse geocoding to get address from coordinates
     private func reverseGeocode(coordinate: CLLocationCoordinate2D) {
         // Avoid multiple simultaneous geocoding requests
         if isReverseGeocodingInProgress { return }
-        isReverseGeocodingInProgress = true
+        
+        DispatchQueue.main.async {
+            isReverseGeocodingInProgress = true
+        }
         
         let geocoder = CLGeocoder()
         let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
@@ -686,36 +880,43 @@ struct BookingLocationPickerView: View {
     private func addressFromPlacemark(_ placemark: CLPlacemark) -> String {
         var components: [String] = []
         
-        if let thoroughfare = placemark.thoroughfare {
+        // Add street number and name
+        if let subThoroughfare = placemark.subThoroughfare, let thoroughfare = placemark.thoroughfare {
+            components.append("\(subThoroughfare) \(thoroughfare)")
+        } else if let thoroughfare = placemark.thoroughfare {
             components.append(thoroughfare)
         }
         
-        if let subThoroughfare = placemark.subThoroughfare {
-            // Add number to street
-            if let lastComponent = components.indices.last {
-                components[lastComponent] = "\(subThoroughfare) \(components[lastComponent])"
-            } else {
-                components.append(subThoroughfare)
-            }
+        // Add sublocality or locality
+        if let subLocality = placemark.subLocality {
+            components.append(subLocality)
         }
         
         if let locality = placemark.locality {
             components.append(locality)
         }
         
+        // Add administrative area (state/province)
         if let administrativeArea = placemark.administrativeArea {
             components.append(administrativeArea)
         }
         
+        // Add postal code
         if let postalCode = placemark.postalCode {
             components.append(postalCode)
         }
         
+        // Add country
         if let country = placemark.country {
             components.append(country)
         }
         
-        return components.joined(separator: ", ")
+        // If no components found, try to use name
+        if components.isEmpty, let name = placemark.name {
+            return name
+        }
+        
+        return components.isEmpty ? "Unknown Location" : components.joined(separator: ", ")
     }
 }
 
@@ -736,6 +937,7 @@ struct MapViewWithRegionTracking: UIViewRepresentable {
     class Coordinator: NSObject, MKMapViewDelegate {
         var parent: MapViewWithRegionTracking
         var isUserInteraction = false
+        var lastRegionUpdate = Date()
         
         init(parent: MapViewWithRegionTracking) {
             self.parent = parent
@@ -749,14 +951,44 @@ struct MapViewWithRegionTracking: UIViewRepresentable {
         }
         
         func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
-            // Update the binding
-            parent.region = mapView.region
+            // Throttle updates to improve performance
+            let now = Date()
+            guard now.timeIntervalSince(lastRegionUpdate) > 0.1 else { return }
+            lastRegionUpdate = now
             
-            // Only notify for user-initiated changes to reduce unnecessary updates
-            if isUserInteraction {
+            // Update the binding
+            DispatchQueue.main.async {
+                self.parent.region = mapView.region
+            }
+            
+            // Only notify for user-initiated changes or after animation completes
+            if isUserInteraction || !animated {
                 parent.onRegionChangeEnd(mapView.region)
                 isUserInteraction = false
             }
+        }
+        
+        func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
+            // Don't customize user location
+            guard !(annotation is MKUserLocation) else {
+                return nil
+            }
+            
+            let identifier = "CustomPin"
+            var annotationView = mapView.dequeueReusableAnnotationView(withIdentifier: identifier) as? MKMarkerAnnotationView
+            
+            if annotationView == nil {
+                annotationView = MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: identifier)
+                annotationView?.canShowCallout = false
+            } else {
+                annotationView?.annotation = annotation
+            }
+            
+            // Customize the pin appearance
+            annotationView?.markerTintColor = UIColor(parent.markerTint)
+            annotationView?.glyphImage = UIImage(systemName: "mappin")
+            
+            return annotationView
         }
     }
     
@@ -768,6 +1000,13 @@ struct MapViewWithRegionTracking: UIViewRepresentable {
         let mapView = MKMapView()
         mapView.delegate = context.coordinator
         mapView.showsUserLocation = true
+        mapView.showsCompass = true
+        mapView.showsScale = true
+        
+        // Configure map appearance for better UX
+        mapView.mapType = .standard
+        mapView.isRotateEnabled = true
+        mapView.isPitchEnabled = false // Disable 3D to keep it simple
         
         // Add annotations for the pins
         updateAnnotations(for: mapView)
@@ -777,9 +1016,11 @@ struct MapViewWithRegionTracking: UIViewRepresentable {
     
     func updateUIView(_ mapView: MKMapView, context: Context) {
         // Only update the region if it's significantly different
-        if abs(mapView.region.center.latitude - region.center.latitude) > 0.0001 ||
-           abs(mapView.region.center.longitude - region.center.longitude) > 0.0001 ||
-           abs(mapView.region.span.latitudeDelta - region.span.latitudeDelta) > 0.001 {
+        let latDiff = abs(mapView.region.center.latitude - region.center.latitude)
+        let lonDiff = abs(mapView.region.center.longitude - region.center.longitude)
+        let spanLatDiff = abs(mapView.region.span.latitudeDelta - region.span.latitudeDelta)
+        
+        if latDiff > 0.0001 || lonDiff > 0.0001 || spanLatDiff > 0.001 {
             mapView.setRegion(region, animated: true)
         }
         
@@ -788,7 +1029,7 @@ struct MapViewWithRegionTracking: UIViewRepresentable {
     }
     
     private func updateAnnotations(for mapView: MKMapView) {
-        // Remove existing annotations
+        // Remove existing annotations (keep user location)
         let existingAnnotations = mapView.annotations.filter { !($0 is MKUserLocation) }
         mapView.removeAnnotations(existingAnnotations)
         
@@ -797,6 +1038,7 @@ struct MapViewWithRegionTracking: UIViewRepresentable {
             let mkAnnotations = annotationItems.map { item -> MKPointAnnotation in
                 let annotation = MKPointAnnotation()
                 annotation.coordinate = item.coordinate
+                annotation.title = "Selected Location"
                 return annotation
             }
             mapView.addAnnotations(mkAnnotations)
