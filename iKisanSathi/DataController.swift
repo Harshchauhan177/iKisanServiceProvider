@@ -1062,7 +1062,8 @@ class DataController: ObservableObject {
         location: String,
         modelYear: String,
         mileage: String,
-        description: String?
+        description: String?,
+        equipmentImage: String? = nil
     ) async throws {
         print("🔄 Updating equipment with ID: \(id)")
         
@@ -1076,6 +1077,7 @@ class DataController: ObservableObject {
             let modelYear: String      // Match Supabase column names
             let mielage: String
             let description: String
+            let equipmentImage: String?
         }
         
         let updates = EquipmentUpdate(
@@ -1087,7 +1089,8 @@ class DataController: ObservableObject {
             location: location,
             modelYear: modelYear,
             mielage: mileage,
-            description: description ?? ""
+            description: description ?? "",
+            equipmentImage: equipmentImage
         )
         
         do {
@@ -1179,12 +1182,13 @@ class DataController: ObservableObject {
         let fileName = "\(UUID().uuidString).jpg"
         let filePath = "equipment_images/\(fileName)"
         
-        // Upload the image to Supabase storage
+        // Upload the image to Supabase storage with content type
         try await supabase.storage
             .from("equipment")
             .upload(
                 path: filePath,
-                file: imageData
+                file: imageData,
+                options: .init(contentType: "image/jpeg")
             )
         
         // Get the public URL for the uploaded image
@@ -1269,6 +1273,11 @@ class DataController: ObservableObject {
         }
     }
     
+    // Helper struct for decoding when only selecting image field
+    private struct ImageOnly: Codable {
+        let image: String
+    }
+    
     // Method to fetch additional images for equipment
     func fetchEquipmentMoreImages(equipmentID: UUID) async throws -> [String] {
         let response = try await supabase.database
@@ -1277,9 +1286,23 @@ class DataController: ObservableObject {
             .eq("equipmentID", value: equipmentID.uuidString)
             .execute()
         
+        // Handle empty response
+        guard !response.data.isEmpty else {
+            print("ℹ️ No additional images found for equipment: \(equipmentID)")
+            return []
+        }
+        
         let decoder = JSONDecoder()
-        let images = try decoder.decode([EquipmentMoreImage].self, from: response.data)
-        return images.map { $0.image }
+        do {
+            // Decode using ImageOnly struct since we only selected image field
+            let images = try decoder.decode([ImageOnly].self, from: response.data)
+            print("✅ Decoded \(images.count) additional images")
+            return images.map { $0.image }
+        } catch {
+            print("⚠️ Failed to decode additional images: \(error)")
+            // If decoding fails, return empty array instead of throwing
+            return []
+        }
     }
     
     func fetchBookings() async throws {
