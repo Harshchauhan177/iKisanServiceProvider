@@ -19,161 +19,129 @@ struct LocationUpdateView: View {
     @State private var errorMessage: String? = nil
     @State private var showingError = false
     @State private var showingSuccess = false
+    @State private var showingLocationPicker = false
+    @State private var selectedLatitude: Double?
+    @State private var selectedLongitude: Double?
+    @State private var selectedAddress: String = ""
     
     private let ikisanGreen = Color(red: 0.298, green: 0.498, blue: 0.345)
     
     var body: some View {
         ZStack {
-            Color(.systemGroupedBackground).ignoresSafeArea()
+            Color(.systemGroupedBackground)
+                .ignoresSafeArea()
             
             if isLoading {
                 LoadingView()
             } else {
-                ScrollView {
-                    VStack(spacing: 20) {
-                        
-                        // Map Section
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("LOCATION ON MAP")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                                .padding(.horizontal)
-                            
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color.white)
-                                    .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
-                                
-                                VStack {
-                                    // Map Preview
-                                    ZStack {
-                                        Color(.systemGray5)
-                                            .frame(height: 200)
-                                        
-                                        // Map placeholder with streets
-                                        Image(systemName: "map")
-                                            .resizable()
-                                            .aspectRatio(contentMode: .fit)
-                                            .frame(width: 100, height: 100)
-                                            .foregroundColor(.gray.opacity(0.7))
-                                            .overlay(
-                                                Image(systemName: "mappin.circle.fill")
-                                                    .resizable()
-                                                    .frame(width: 30, height: 30)
-                                                    .foregroundColor(.red)
-                                                    .offset(y: -10)
-                                            )
-                                    }
-                                    
-                                    // Choose Location Button
-                                    Button(action: {
-                                        // Action to open map picker
-                                    }) {
-                                        HStack {
-                                            Image(systemName: "map")
-                                                .foregroundColor(ikisanGreen)
-                                            Text("Choose Location on Map")
-                                                .foregroundColor(ikisanGreen)
-                                        }
-                                        .padding()
-                                        .frame(maxWidth: .infinity)
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 8)
-                                                .stroke(ikisanGreen, lineWidth: 1)
-                                        )
-                                    }
-                                    .padding(.horizontal)
-                                    .padding(.bottom)
-                                }
-                            }
-                            .padding(.bottom)
-                        }
-                        
-                        // Address Details Section
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("ADDRESS DETAILS")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                                .padding(.horizontal)
-                            
-                            VStack(spacing: 0) {
-                                // City
-                                TextField("Greater Noida", text: $city)
-                                    .padding()
-                                    .background(Color.white)
-                                
-                                Divider()
-                                
-                                // State
-                                TextField("Uttar Pradesh", text: $state)
-                                    .padding()
-                                    .background(Color.white)
-                                
-                                Divider()
-                                
-                                // Postal Code
-                                TextField("201310", text: $postalCode)
-                                    .padding()
-                                    .background(Color.white)
-                                    .keyboardType(.numberPad)
-                                
-                                Divider()
-                                
-                                // Country
-                                TextField("India", text: $country)
-                                    .padding()
-                                    .background(Color.white)
-                            }
-                            .background(Color.white)
-                            .cornerRadius(8)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .stroke(Color.gray.opacity(0.3), lineWidth: 1)
-                            )
-                            .padding(.horizontal)
-                        }
-                        
-                        // Use Current Location Button
+                Form {
+                    // Map Location Section
+                    Section {
                         Button(action: {
-                            // This would typically use CoreLocation to get the user's current location
-                            // For this example, we'll just set placeholder values
-                            city = "Greater Noida"
-                            state = "Uttar Pradesh"
-                            postalCode = "201310"
-                            country = "India"
+                            showingLocationPicker = true
                         }) {
-                            HStack {
-                                Image(systemName: "location.fill")
-                                Text("Use Current Location")
+                            HStack(spacing: 12) {
+                                Image(systemName: "map.fill")
+                                    .font(.system(size: 20))
+                                    .foregroundColor(.white)
+                                    .frame(width: 36, height: 36)
+                                    .background(ikisanGreen)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Choose Location")
+                                        .font(.body)
+                                        .foregroundColor(.primary)
+                                    if !selectedAddress.isEmpty {
+                                        Text(selectedAddress)
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                            .lineLimit(2)
+                                    } else {
+                                        Text("Tap to select on map")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                                
+                                Spacer()
+                                
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
                             }
-                            .foregroundColor(.white)
-                            .padding()
-                            .frame(maxWidth: .infinity)
-                            .background(ikisanGreen)
-                            .cornerRadius(8)
+                            .padding(.vertical, 4)
                         }
-                        .padding(.horizontal)
-                        
-                        // Save Address Button
-                        Button(action: updateAddress) {
-                            Text("Save Address")
-                                .fontWeight(.semibold)
-                                .foregroundColor(.white)
-                                .padding()
-                                .frame(maxWidth: .infinity)
-                                .background(ikisanGreen)
-                                .cornerRadius(8)
-                        }
-                        .padding(.horizontal)
-                        .disabled(city.isEmpty || state.isEmpty || postalCode.isEmpty || country.isEmpty)
-                        .opacity(city.isEmpty || state.isEmpty || postalCode.isEmpty || country.isEmpty ? 0.6 : 1)
+                        .buttonStyle(PlainButtonStyle())
+                    } header: {
+                        Text("Location")
+                            .textCase(.uppercase)
                     }
-                    .padding(.vertical)
+                    
+                    // Address Details Section
+                    Section {
+                        HStack {
+                            Image(systemName: "building.2.fill")
+                                .foregroundColor(ikisanGreen)
+                                .frame(width: 24)
+                            TextField("City", text: $city)
+                        }
+                        
+                        HStack {
+                            Image(systemName: "map.fill")
+                                .foregroundColor(ikisanGreen)
+                                .frame(width: 24)
+                            TextField("State", text: $state)
+                        }
+                        
+                        HStack {
+                            Image(systemName: "number")
+                                .foregroundColor(ikisanGreen)
+                                .frame(width: 24)
+                            TextField("Postal Code", text: $postalCode)
+                                .keyboardType(.numberPad)
+                        }
+                        
+                        HStack {
+                            Image(systemName: "globe")
+                                .foregroundColor(ikisanGreen)
+                                .frame(width: 24)
+                            TextField("Country", text: $country)
+                        }
+                    } header: {
+                        Text("Address Details")
+                            .textCase(.uppercase)
+                    } footer: {
+                        Text("All fields are required to save your address.")
+                            .font(.caption)
+                    }
+                    
+                    // Save Button Section
+                    Section {
+                        Button(action: updateAddress) {
+                            HStack {
+                                Spacer()
+                                Text("Save Address")
+                                    .fontWeight(.semibold)
+                                Spacer()
+                            }
+                        }
+                        .disabled(city.isEmpty || state.isEmpty || postalCode.isEmpty || country.isEmpty)
+                        .foregroundColor(city.isEmpty || state.isEmpty || postalCode.isEmpty || country.isEmpty ? .secondary : .white)
+                        .listRowBackground(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(city.isEmpty || state.isEmpty || postalCode.isEmpty || country.isEmpty ? Color(.systemGray5) : ikisanGreen)
+                        )
+                    }
                 }
+                .scrollContentBackground(.hidden)
             }
         }
         .navigationTitle("Update Address")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            loadExistingAddress()
+        }
         .alert("Error", isPresented: $showingError) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -185,6 +153,99 @@ struct LocationUpdateView: View {
             }
         } message: {
             Text("Your address has been updated successfully.")
+        }
+        .fullScreenCover(isPresented: $showingLocationPicker) {
+            NavigationView {
+                LocationPickerViewController_SwiftUI_Closure(
+                    latitude: selectedLatitude ?? 28.4595, // Default to Greater Noida
+                    longitude: selectedLongitude ?? 77.5026,
+                    address: selectedAddress.isEmpty ? nil : selectedAddress,
+                    purpose: .addressUpdate,
+                    onLocationSelected: { latitude, longitude, address in
+                        selectedLatitude = latitude
+                        selectedLongitude = longitude
+                        if let address = address {
+                            selectedAddress = address
+                            parseAddress(from: address)
+                        }
+                        showingLocationPicker = false
+                    }
+                )
+                .navigationTitle("Select Location")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button("Cancel") {
+                            showingLocationPicker = false
+                        }
+                    }
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("Done") {
+                            // Get the selected location from the location manager
+                            let locationManager = LocationManager.shared
+                            if let selectedLocation = locationManager.selectedLocation {
+                                selectedLatitude = selectedLocation.latitude
+                                selectedLongitude = selectedLocation.longitude
+                                if let address = selectedLocation.address {
+                                    selectedAddress = address
+                                    parseAddress(from: address)
+                                }
+                            }
+                            showingLocationPicker = false
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    private func loadExistingAddress() {
+        // Load existing address from current producer
+        guard let currentProducer = dataController.currentProducer,
+              let location = currentProducer.location,
+              !location.isEmpty else {
+            return
+        }
+        
+        // Parse the existing location
+        selectedAddress = location
+        parseAddress(from: location)
+    }
+    
+    private func parseAddress(from fullAddress: String) {
+        // Split the address by commas
+        let components = fullAddress.components(separatedBy: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+        
+        // Try to intelligently parse the address components
+        // Typical format: "Street, City, State PostalCode, Country"
+        if components.count >= 2 {
+            // Extract country (usually last component)
+            if let lastComponent = components.last, !lastComponent.isEmpty {
+                country = lastComponent
+            }
+            
+            // Extract city (usually first or second component)
+            if components.count >= 2 {
+                city = components[0]
+            }
+            
+            // Extract state and postal code (usually second to last component)
+            if components.count >= 3 {
+                let statePostalComponent = components[components.count - 2]
+                // Try to separate state and postal code
+                let parts = statePostalComponent.components(separatedBy: " ")
+                if parts.count >= 2 {
+                    // Last part might be postal code
+                    if let lastPart = parts.last, lastPart.rangeOfCharacter(from: .decimalDigits) != nil {
+                        postalCode = lastPart
+                        state = parts.dropLast().joined(separator: " ")
+                    } else {
+                        state = statePostalComponent
+                    }
+                } else {
+                    state = statePostalComponent
+                }
+            }
         }
     }
     
