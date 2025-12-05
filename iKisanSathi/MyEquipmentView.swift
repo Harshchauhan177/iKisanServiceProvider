@@ -116,13 +116,15 @@ struct MyEquipmentView: View {
                     }
             }
             .sheet(item: $selectedEquipment) { equipment in
-                EditEquipmentView(equipment: equipment)
-                    .environmentObject(dataController)
-                    .onDisappear {
-                        Task {
-                            await loadEquipment()
-                        }
+                NavigationView {
+                    EditEquipmentView(equipment: equipment, isPresentedModally: true)
+                        .environmentObject(dataController)
+                }
+                .onDisappear {
+                    Task {
+                        await loadEquipment()
                     }
+                }
             }
             .alert("Error", isPresented: $showError) {
                 Button("OK", role: .cancel) { }

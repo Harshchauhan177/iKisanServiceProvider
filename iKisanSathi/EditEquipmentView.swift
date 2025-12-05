@@ -5,6 +5,7 @@ struct EditEquipmentView: View {
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var dataController: DataController
     let equipment: DataController.Equipment
+    var isPresentedModally: Bool = false  // Default to false for push navigation
     
     @State private var name: String
     @State private var type: String
@@ -55,8 +56,9 @@ struct EditEquipmentView: View {
     
     let equipmentTypes = ["Agricultural", "Rice", "Wheat"]
     
-    init(equipment: DataController.Equipment) {
+    init(equipment: DataController.Equipment, isPresentedModally: Bool = false) {
         self.equipment = equipment
+        self.isPresentedModally = isPresentedModally
         _name = State(initialValue: equipment.name)
         _type = State(initialValue: equipment.type)
         _capacity = State(initialValue: equipment.capacity)
@@ -75,8 +77,7 @@ struct EditEquipmentView: View {
     }
     
     var body: some View {
-        NavigationView {
-            Form {
+        Form {
                 Section(header: Text("Basic Information")) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Equipment Name")
@@ -522,11 +523,14 @@ struct EditEquipmentView: View {
             .navigationTitle("Edit Equipment")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
+                // Only show Cancel button when presented modally (sheet)
+                if isPresentedModally {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button("Cancel") {
+                            dismiss()
+                        }
+                        .disabled(isSaving)
                     }
-                    .disabled(isSaving)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Save") {
@@ -601,7 +605,6 @@ struct EditEquipmentView: View {
                     await loadAdditionalImages()
                 }
             }
-        }
     }
     
     // MARK: - Helper Methods

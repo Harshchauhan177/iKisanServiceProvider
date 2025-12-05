@@ -184,60 +184,7 @@ struct HomeView: View {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 12) {
                                 ForEach(Array(dataController.equipmentDetails.values.prefix(5)), id: \.equipmentID) { equipment in
-                                    NavigationLink(destination: EditEquipmentView(equipment: equipment)) {
-                                        VStack(alignment: .leading, spacing: 0) {
-                                            ZStack(alignment: .topTrailing) {
-                                                EquipmentImageCarousel(
-                                                    mainImageUrl: equipment.equipmentImage,
-                                                    equipmentID: equipment.equipmentID
-                                                )
-                                                .frame(width: 180, height: 180)
-                                                .clipped()
-                                                .clipShape(
-                                                    RoundedCorner(radius: 12, corners: [.topLeft, .topRight])
-                                                )
-                                            }
-                                            
-                                            VStack(alignment: .leading, spacing: 8) {
-                                                Text(equipment.name)
-                                                    .font(.system(size: 17, weight: .semibold))
-                                                    .foregroundColor(.primary)
-                                                    .lineLimit(1)
-                                                // Pricing row
-                                                HStack {
-                                                    // Per Hour
-                                                    VStack(alignment: .leading) {
-                                                        Text("Per Hour")
-                                                            .font(.system(size: 13))
-                                                            .foregroundColor(.secondary)
-                                                        Text("₹\(String(format: "%.0f", equipment.pricePerHour))")
-                                                            .font(.system(size: 15, weight: .medium))
-                                                            .foregroundColor(.primary)
-                                                    }
-                                                    
-                                                    Spacer()
-                                                    
-                                                    // Per Acre
-                                                    VStack(alignment: .leading) {
-                                                        Text("Per Acre")
-                                                            .font(.system(size: 13))
-                                                            .foregroundColor(.secondary)
-                                                        Text("₹\(String(format: "%.0f", equipment.pricePerAcre))")
-                                                            .font(.system(size: 15, weight: .medium))
-                                                            .foregroundColor(.primary)
-                                                    }
-                                                    
-//                                                Spacer()
-                                                }
-                                            }
-                                            .padding(.horizontal, 12)
-                                            .padding(.vertical, 12)
-                                        }
-                                        .frame(width: 180)
-                                        .background(Color(.systemBackground))
-                                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                                        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
-                                    }
+                                    TopEquipmentCard(equipment: equipment)
                                 }
                             }
                             .padding(.horizontal)
@@ -501,5 +448,98 @@ struct RoundedCorner: Shape {
             cornerRadii: CGSize(width: radius, height: radius)
         )
         return Path(path.cgPath)
+    }
+}
+
+// Top Equipment Card with context menu for delete
+struct TopEquipmentCard: View {
+    let equipment: DataController.Equipment
+    @State private var showingDeleteAlert = false
+    @State private var showingErrorAlert = false
+    @State private var errorMessage = ""
+    @EnvironmentObject var dataController: DataController
+    
+    var body: some View {
+        NavigationLink(destination: EditEquipmentView(equipment: equipment)) {
+            VStack(alignment: .leading, spacing: 0) {
+                ZStack(alignment: .topTrailing) {
+                    EquipmentImageCarousel(
+                        mainImageUrl: equipment.equipmentImage,
+                        equipmentID: equipment.equipmentID
+                    )
+                    .frame(width: 180, height: 180)
+                    .clipped()
+                    .clipShape(
+                        RoundedCorner(radius: 12, corners: [.topLeft, .topRight])
+                    )
+                }
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(equipment.name)
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                    // Pricing row
+                    HStack {
+                        // Per Hour
+                        VStack(alignment: .leading) {
+                            Text("Per Hour")
+                                .font(.system(size: 13))
+                                .foregroundColor(.secondary)
+                            Text("₹\(String(format: "%.0f", equipment.pricePerHour))")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundColor(.primary)
+                        }
+                        
+                        Spacer()
+                        
+                        // Per Acre
+                        VStack(alignment: .leading) {
+                            Text("Per Acre")
+                                .font(.system(size: 13))
+                                .foregroundColor(.secondary)
+                            Text("₹\(String(format: "%.0f", equipment.pricePerAcre))")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundColor(.primary)
+                        }
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 12)
+            }
+            .frame(width: 180)
+            .background(Color(.systemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+        }
+        .contextMenu {
+            Button(role: .destructive) {
+                showingDeleteAlert = true
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+        .alert("Delete Equipment", isPresented: $showingDeleteAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                Task {
+                    do {
+                        try await dataController.deleteEquipment(id: equipment.equipmentID)
+                        // Refresh data after deletion
+                        try await dataController.fetchProducerEquipmentAndRequests()
+                    } catch {
+                        errorMessage = error.localizedDescription
+                        showingErrorAlert = true
+                    }
+                }
+            }
+        } message: {
+            Text("Are you sure you want to delete this equipment? This action cannot be undone.")
+        }
+        .alert("Error", isPresented: $showingErrorAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(errorMessage)
+        }
     }
 }
