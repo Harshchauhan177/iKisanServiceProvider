@@ -175,7 +175,7 @@ class DataController: ObservableObject {
         let createdAt: Date
     }
     
-    struct Equipment: Codable {
+    struct Equipment: Codable, Identifiable {
         let equipmentID: UUID
         let equipmentImage: String
         var name: String
@@ -197,6 +197,8 @@ class DataController: ObservableObject {
         let isRecommended: Bool
         let providerName: String
         let preBookingStatus: String?
+        
+        var id: UUID { equipmentID }
         
         var startDate: Date? {
             let formatter = DateFormatter()

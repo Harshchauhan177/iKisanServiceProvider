@@ -28,7 +28,6 @@ struct EquipmentImageCarousel: View {
                 }
                 .tabViewStyle(PageTabViewStyle(indexDisplayMode: .automatic))
                 .indexViewStyle(PageIndexViewStyle(backgroundDisplayMode: .always))
-                .simultaneousGesture(TapGesture(), including: .subviews)
             } else {
                 WebImage(url: URL(string: mainImageUrl))
                     .resizable()
@@ -56,7 +55,6 @@ struct MyEquipmentView: View {
     @EnvironmentObject var dataController: DataController
     @State private var showingAddEquipment = false
     @State private var selectedEquipment: DataController.Equipment?
-    @State private var showingEditSheet = false
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var showError = false
@@ -87,10 +85,6 @@ struct MyEquipmentView: View {
                             ForEach(Array(dataController.equipmentDetails.values), id: \.equipmentID) { equipment in
                                 EquipmentCard(equipment: equipment, onEdit: {
                                     selectedEquipment = equipment
-                                    // Small delay to ensure state is set before sheet presentation
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                        showingEditSheet = true
-                                    }
                                 })
                                 .padding(4)
                             }
@@ -121,22 +115,14 @@ struct MyEquipmentView: View {
                         }
                     }
             }
-            .sheet(isPresented: $showingEditSheet) {
-                if let equipment = selectedEquipment {
-                    EditEquipmentView(equipment: equipment)
-                        .environmentObject(dataController)
-                        .onDisappear {
-                            selectedEquipment = nil
-                            Task {
-                                await loadEquipment()
-                            }
+            .sheet(item: $selectedEquipment) { equipment in
+                EditEquipmentView(equipment: equipment)
+                    .environmentObject(dataController)
+                    .onDisappear {
+                        Task {
+                            await loadEquipment()
                         }
-                } else {
-                    Text("Error loading equipment")
-                        .onAppear {
-                            showingEditSheet = false
-                        }
-                }
+                    }
             }
             .alert("Error", isPresented: $showError) {
                 Button("OK", role: .cancel) { }
@@ -164,7 +150,6 @@ struct MyEquipmentView: View {
 struct EquipmentCard: View {
     let equipment: DataController.Equipment
     let onEdit: () -> Void
-    @State private var showingActionSheet = false
     @State private var showingDeleteAlert = false
     @State private var showingErrorAlert = false
     @State private var errorMessage = ""
@@ -179,21 +164,6 @@ struct EquipmentCard: View {
                 )
                 .frame(width: geometry.size.width, height: geometry.size.width)
                 .clipped()
-                .overlay(
-                    Button {
-                        showingActionSheet = true
-                    } label: {
-                        Image(systemName: "ellipsis")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(.white)
-                            .frame(width: 36, height: 36)
-                            .background(Circle().fill(Color.black.opacity(0.7)))
-                    }
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-                    .padding(8),
-                    alignment: .topTrailing
-                )
             }
             .aspectRatio(1, contentMode: .fit)
             
@@ -229,16 +199,15 @@ struct EquipmentCard: View {
         .background(Color(.systemBackground))
         .cornerRadius(12)
         .shadow(color: Color(.systemGray4).opacity(0.3), radius: 4, x: 0, y: 2)
-        .confirmationDialog("Equipment Actions", isPresented: $showingActionSheet) {
-            Button("Edit") {
-                onEdit()
-            }
-            Button("Delete", role: .destructive) {
+        .onTapGesture {
+            onEdit()
+        }
+        .contextMenu {
+            Button(role: .destructive) {
                 showingDeleteAlert = true
+            } label: {
+                Label("Delete", systemImage: "trash")
             }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Choose an action")
         }
         .alert("Delete Equipment", isPresented: $showingDeleteAlert) {
             Button("Cancel", role: .cancel) { }
