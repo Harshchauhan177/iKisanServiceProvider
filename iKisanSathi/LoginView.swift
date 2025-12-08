@@ -17,83 +17,155 @@ struct LoginView: View {
             if appleVM.isAuthenticated && appleVM.navigateToHome {
                 MainTabView()
             } else {
-                VStack {
-                    VStack(spacing: 20) {
-                        Text("Producer Login")
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
-                            .padding(.bottom, 30)
+                ScrollView {
+                    VStack(spacing: 0) {
+                        // App Logo and Name Section
+                        VStack(spacing: 16) {
+                            Image("iKisan")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 100, height: 100)
+                                .clipShape(RoundedRectangle(cornerRadius: 20))
+                                .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
+                            
+                            Text("iKisanSathi")
+                                .font(.system(size: 34, weight: .bold, design: .rounded))
+                                .foregroundColor(.primary)
+                        }
+                        .padding(.top, 60)
+                        .padding(.bottom, 50)
                         
-                        TextField("Email", text: $email)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                            .autocapitalization(.none)
-                            .keyboardType(.emailAddress)
-                        
-                        SecureField("Password", text: $password)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                        
-                        // Forgot Password Button
-                        HStack {
-                            Spacer()
-                            Button(action: { showingForgotPassword = true }) {
-                                Text("Forgot Password?")
+                        // Login Form Section
+                        VStack(spacing: 16) {
+                            // Email Field
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Email")
                                     .font(.subheadline)
-                                    .foregroundColor(.blue)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.secondary)
+                                
+                                TextField("Enter your email", text: $email)
+                                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                                    .autocapitalization(.none)
+                                    .keyboardType(.emailAddress)
+                                    .textContentType(.emailAddress)
                             }
-                        }
-                        .padding(.top, -10)
-                        
-                        Button(action: login) {
-                            Text("Login")
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color.blue)
-                                .cornerRadius(10)
-                        }
-                        
-                        Button(action: { showingSignUp = true }) {
-                            Text("Don't have an account? Sign Up")
-                                .foregroundColor(.blue)
-                        }
-                    }
-                    .padding()
-                    
-                    NavigationLink(isActive: $showingSignUp) {
-                        SignUpView()
-                    } label: {
-                        EmptyView()
-                    }
-                    
-                    .padding()
-                    .loading(isLoading)
-                    .alert("Error", isPresented: $showingAlert) {
-                        Button("OK", role: .cancel) { }
-                    } message: {
-                        Text(alertMessage)
-                    }
-                    
-                    SignInWithAppleButton(.signIn, onRequest: { request in
-                        request.requestedScopes = [.fullName, .email]
-                    }, onCompletion: { result in
-                        switch result {
-                        case .success(let authResults):
-                            if let appleIDCredential = authResults.credential as? ASAuthorizationAppleIDCredential {
-                                Task {
-                                    await appleVM.handleAppleSignIn(credential: appleIDCredential)
-                                    // Don't set session in DataController until profile is completed
-                                    // This will be handled in the ProfileCompletionView when user submits
+                            
+                            // Password Field
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Password")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.secondary)
+                                
+                                SecureField("Enter your password", text: $password)
+                                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                                    .textContentType(.password)
+                            }
+                            
+                            // Forgot Password Button
+                            HStack {
+                                Spacer()
+                                Button(action: { showingForgotPassword = true }) {
+                                    Text("Forgot Password?")
+                                        .font(.subheadline)
+                                        .fontWeight(.medium)
                                 }
                             }
-                        case .failure(let error):
-                            appleVM.errorMessage = error.localizedDescription
+                            .padding(.top, 4)
+                            
+                            // Login Button
+                            Button(action: login) {
+                                Text("Log In")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 16)
+                                    .background(
+                                        LinearGradient(
+                                            gradient: Gradient(colors: [Color.blue, Color.blue.opacity(0.8)]),
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
+                                    .cornerRadius(12)
+                                    .shadow(color: Color.blue.opacity(0.3), radius: 8, x: 0, y: 4)
+                            }
+                            .padding(.top, 8)
+                            .disabled(isLoading)
+                            
+                            // Divider with "or"
+                            HStack {
+                                Rectangle()
+                                    .fill(Color.secondary.opacity(0.3))
+                                    .frame(height: 1)
+                                
+                                Text("or")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                    .padding(.horizontal, 8)
+                                
+                                Rectangle()
+                                    .fill(Color.secondary.opacity(0.3))
+                                    .frame(height: 1)
+                            }
+                            .padding(.vertical, 16)
+                            
+                            // Sign in with Apple Button
+                            SignInWithAppleButton(.signIn, onRequest: { request in
+                                request.requestedScopes = [.fullName, .email]
+                            }, onCompletion: { result in
+                                switch result {
+                                case .success(let authResults):
+                                    if let appleIDCredential = authResults.credential as? ASAuthorizationAppleIDCredential {
+                                        Task {
+                                            await appleVM.handleAppleSignIn(credential: appleIDCredential)
+                                            // Don't set session in DataController until profile is completed
+                                            // This will be handled in the ProfileCompletionView when user submits
+                                        }
+                                    }
+                                case .failure(let error):
+                                    appleVM.errorMessage = error.localizedDescription
+                                }
+                            })
+                            .signInWithAppleButtonStyle(.black)
+                            .frame(height: 50)
+                            .cornerRadius(12)
+                            
+                            // Sign Up Link
+                            HStack {
+                                Text("Don't have an account?")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                
+                                Button(action: { showingSignUp = true }) {
+                                    Text("Sign Up")
+                                        .font(.subheadline)
+                                        .fontWeight(.semibold)
+                                }
+                            }
+                            .padding(.top, 16)
                         }
-                    })
-                    .signInWithAppleButtonStyle(.black)
-                    .frame(height: 50)
-                    .padding()
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 40)
+                    }
+                }
+                .background(Color(.systemGroupedBackground))
+                .navigationBarHidden(true)
+                
+                // Hidden Navigation Links
+                NavigationLink(isActive: $showingSignUp) {
+                    SignUpView()
+                } label: {
+                    EmptyView()
                 }
             }
+        }
+        .loading(isLoading)
+        .alert("Error", isPresented: $showingAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(alertMessage)
         }
         .sheet(isPresented: $appleVM.showProfileCompletion) {
             ProfileCompletionView(userEmail: appleVM.pendingUserEmail, viewModel: appleVM)
