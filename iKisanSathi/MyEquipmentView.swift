@@ -66,21 +66,25 @@ struct MyEquipmentView: View {
                 if isLoading {
                     ProgressView("Loading equipment...")
                 } else if dataController.equipmentDetails.isEmpty {
-                    VStack(spacing: 16) {
+                    VStack(spacing: 20) {
                         Image(systemName: "wrench.and.screwdriver")
-                            .font(.system(size: 50))
-                            .foregroundColor(.gray)
-                        Text("No equipment added yet")
-                            .font(.headline)
-                        Text("Tap + to add your first equipment")
-                            .font(.subheadline)
+                            .font(.system(size: 64))
                             .foregroundColor(.secondary)
+                        VStack(spacing: 8) {
+                            Text("No equipment added yet")
+                                .font(.title3)
+                                .fontWeight(.semibold)
+                            Text("Tap + to add your first equipment")
+                                .font(.body)
+                                .foregroundColor(.secondary)
+                        }
                     }
+                    .padding()
                 } else {
                     ScrollView {
                         LazyVGrid(columns: [
-                            GridItem(.flexible()),
-                            GridItem(.flexible())
+                            GridItem(.flexible(), spacing: 16),
+                            GridItem(.flexible(), spacing: 16)
                         ], spacing: 16) {
                             ForEach(Array(dataController.equipmentDetails.values), id: \.equipmentID) { equipment in
                                 EquipmentCard(equipment: equipment, onEdit: {
@@ -200,10 +204,13 @@ struct EquipmentCard: View {
         }
         .background(Color(.systemBackground))
         .cornerRadius(12)
-        .shadow(color: Color(.systemGray4).opacity(0.3), radius: 4, x: 0, y: 2)
+        .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 2)
         .onTapGesture {
             onEdit()
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(equipment.name), \(equipment.type)")
+        .accessibilityHint("Double tap to edit equipment details")
         .contextMenu {
             Button(role: .destructive) {
                 showingDeleteAlert = true

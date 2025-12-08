@@ -131,7 +131,7 @@ struct ProfileView: View {
                     }
                     .padding()
                     .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemBackground)))
-                    .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+                    .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 2)
                     
                     // Account Details Section
                     VStack(alignment: .leading, spacing: 0) {
@@ -216,7 +216,7 @@ struct ProfileView: View {
                     }
                     .padding()
                     .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemBackground)))
-                    .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+                    .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 2)
                     
                     }
 
@@ -277,7 +277,7 @@ struct ProfileView: View {
                             }
                         }
                         .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemBackground)))
-                        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+                        .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 2)
                      }
                     // Legal Section with both cards
                     VStack(alignment: .leading, spacing: 0) {
@@ -335,7 +335,7 @@ struct ProfileView: View {
                             }
                         }
                         .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemBackground)))
-                        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+                        .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 2)
                     }
                     
                     
@@ -360,7 +360,7 @@ struct ProfileView: View {
                             .padding()
                         }
                         .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemBackground)))
-                        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+                        .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 2)
                     }
                 }
                 .padding()

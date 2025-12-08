@@ -56,10 +56,10 @@ struct RequestsView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if selectedRequestType == 0 && filteredRequests.isEmpty && filteredBookings.isEmpty ||
                           selectedRequestType == 1 && filteredRequests.isEmpty {
-                    VStack(spacing: 16) {
+                    VStack(spacing: 20) {
                         Image(systemName: selectedRequestType == 0 ? "person.slash" : "person.2.slash")
-                            .font(.system(size: 60))
-                            .foregroundColor(Color(.systemGray4))
+                            .font(.system(size: 64))
+                            .foregroundColor(.secondary)
                         
                         VStack(spacing: 8) {
                             Text("No \(selectedRequestType == 0 ? "Individual" : "Co-Equip") Requests")
@@ -67,7 +67,7 @@ struct RequestsView: View {
                                 .foregroundColor(.primary)
                             
                             Text("New requests will appear here")
-                                .font(.subheadline)
+                                .font(.body)
                                 .foregroundColor(.secondary)
                         }
                     }

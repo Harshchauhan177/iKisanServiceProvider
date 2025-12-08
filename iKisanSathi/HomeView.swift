@@ -100,15 +100,24 @@ struct HomeView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 24) {
-                    // Subtitle below large title
-                    HStack {
-                            Text("how are you today?")
+                    // Welcome Header
+                    VStack(alignment: .leading, spacing: 4) {
+                        if let name = dataController.currentProducer?.name {
+                            Text("Welcome, \(name)")
+                                .font(.title2)
+                                .fontWeight(.semibold)
+                        } else {
+                            Text("Welcome")
+                                .font(.title2)
+                                .fontWeight(.semibold)
+                        }
+                        Text("How are you today?")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
-                        Spacer()
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal)
-                    .padding(.top, 2)
+                    .padding(.top, 8)
 
                     // Add Equipment Card
                     Button {
@@ -137,19 +146,22 @@ struct HomeView: View {
                         .padding()
                         .background(Color(.systemBackground))
                         .cornerRadius(16)
+                        .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 2)
                     }
+                    .accessibilityLabel("Add Equipment")
+                    .accessibilityHint("List your equipment for service")
                     .padding(.horizontal)
                     .sheet(isPresented: $showingAddEquipment) {
                         AddEquipmentView()
                     }
                     
                     // Quick Access Grid
-                    VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 16) {
                         Text("Quick Access")
-                            .font(.title3)
-                            .fontWeight(.bold)
+                            .font(.title2)
+                            .fontWeight(.semibold)
                             .padding(.horizontal)
-                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 20) {
+                        LazyVGrid(columns: [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)], spacing: 16) {
                             QuickAccessButton(title: "Equipment", iconName: "wrench.and.screwdriver.fill", color: .blue) {
                                     selectedTab = 2
                                 }
@@ -229,21 +241,22 @@ struct HomeView: View {
                                     .prefix(3)
                                 
                                 if sortedRequests.isEmpty {
-                                    VStack(alignment: .center, spacing: 8) {
+                                    VStack(spacing: 16) {
                                         Image(systemName: "calendar.badge.clock")
-                                            .font(.system(size: 40))
-                                            .foregroundColor(.gray)
-                                        Text("No active requests for today")
-                                            .font(.headline)
-                                            .foregroundColor(.gray)
-                                        Text("Total requests: \(dataController.serviceRequests.count)")
-                                            .font(.caption)
-                                            .foregroundColor(.gray)
+                                            .font(.system(size: 48))
+                                            .foregroundColor(.secondary)
+                                        VStack(spacing: 4) {
+                                            Text("No active requests for today")
+                                                .font(.headline)
+                                                .foregroundColor(.primary)
+                                            Text("Total requests: \(dataController.serviceRequests.count)")
+                                                .font(.subheadline)
+                                                .foregroundColor(.secondary)
+                                        }
                                     }
-                                    .frame(width: UIScreen.main.bounds.width - 32)
-                                    .padding()
-                                    .background(Color(.systemBackground))
-                                    .cornerRadius(12)
+                                    .frame(width: UIScreen.main.bounds.width - 32, height: 160)
+                                    .background(Color(.secondarySystemGroupedBackground))
+                                    .cornerRadius(16)
                                 } else {
                                     ForEach(Array(sortedRequests), id: \.id) { request in
                                         NavigationLink(destination: ServiceRequestDetailView(serviceRequest: request)) {
@@ -328,7 +341,7 @@ struct HomeView: View {
                                             .frame(width: UIScreen.main.bounds.width - 32)
                                             .background(Color(.systemBackground))
                                             .cornerRadius(16)
-                                            .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+                                            .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 2)
                                         }
                                     }
                                 }
@@ -346,7 +359,7 @@ struct HomeView: View {
                 await refreshHomeData()
             }
             .background(Color(.systemGroupedBackground))
-            .navigationTitle("Welcome" + (dataController.currentProducer?.name != nil ? ", \(dataController.currentProducer!.name)" : ""))
+            .navigationTitle("Home")
             .navigationBarTitleDisplayMode(.large)
             .navigationBarHidden(false)
             .toolbar {
@@ -415,10 +428,10 @@ struct QuickAccessButton: View {
     let onTap: () -> Void
     var body: some View {
         Button(action: onTap) {
-            VStack(spacing: 10) {
+            VStack(spacing: 12) {
                 ZStack {
                     Circle()
-                        .fill(Color(.secondarySystemBackground))
+                        .fill(color.opacity(0.15))
                         .frame(width: 56, height: 56)
                     Image(systemName: iconName)
                         .font(.system(size: 24))
@@ -426,14 +439,17 @@ struct QuickAccessButton: View {
                 }
                 Text(title)
                     .font(.body)
+                    .fontWeight(.medium)
                     .foregroundColor(.primary)
             }
-            .frame(maxWidth: .infinity, minHeight: 100)
+            .frame(maxWidth: .infinity, minHeight: 120)
             .background(Color(.systemBackground))
             .cornerRadius(16)
-            .shadow(color: Color.black.opacity(0.03), radius: 2, x: 0, y: 1)
+            .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: 2)
         }
         .buttonStyle(PlainButtonStyle())
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(.isButton)
     }
 }
 
@@ -510,7 +526,7 @@ struct TopEquipmentCard: View {
             .frame(width: 180)
             .background(Color(.systemBackground))
             .clipShape(RoundedRectangle(cornerRadius: 12))
-            .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+            .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 2)
         }
         .contextMenu {
             Button(role: .destructive) {

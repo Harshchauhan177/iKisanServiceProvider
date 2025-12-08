@@ -15,13 +15,18 @@ struct ServiceRequestsView: View {
             if isLoading {
                 ProgressView()
             } else if inProgressRequests.isEmpty {
-                VStack(spacing: 12) {
+                VStack(spacing: 20) {
                     Image(systemName: "archivebox")
-                        .font(.system(size: 50))
-                        .foregroundColor(Color(.systemGray4))
-                    Text("No service requests found")
-                        .font(.system(size: 17))
-                        .foregroundColor(Color(.systemGray))
+                        .font(.system(size: 64))
+                        .foregroundColor(.secondary)
+                    VStack(spacing: 8) {
+                        Text("No service requests found")
+                            .font(.title3)
+                            .fontWeight(.semibold)
+                        Text("Your active requests will appear here")
+                            .font(.body)
+                            .foregroundColor(.secondary)
+                    }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -244,7 +249,7 @@ struct ServiceRequestRow: View {
         .frame(maxWidth: .infinity, alignment: .leading) // Make card fill width
         .background(Color(.systemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))
-        .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 2)
+        .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 2)
         .overlay(Group {
             if isLoading {
                 Color.black.opacity(0.3)
