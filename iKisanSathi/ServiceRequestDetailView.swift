@@ -7,6 +7,58 @@ struct ServiceRequestDetailView: View {
     @Environment(\.dismiss) var dismiss
     @State private var isConfirming = false
     
+    // Check if the service date is today
+    private var isServiceDateToday: Bool {
+        guard let serviceDate = parseServiceDate() else {
+            return false
+        }
+        
+        let calendar = Calendar.current
+        return calendar.isDateInToday(serviceDate)
+    }
+    
+    // Helper function to parse service date with multiple format attempts
+    private func parseServiceDate() -> Date? {
+        // Try multiple date formats
+        let formats = [
+            "yyyy-MM-dd'T'HH:mm:ss",
+            "yyyy-MM-dd",
+            "yyyy-MM-dd'T'HH:mm:ssZ",
+            "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
+        ]
+        
+        for format in formats {
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = format
+            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+            dateFormatter.timeZone = TimeZone.current
+            
+            if let date = dateFormatter.date(from: serviceRequest.date) {
+                return date
+            }
+        }
+        
+        return nil
+    }
+    
+    // Get a user-friendly message for when Complete is disabled
+    private var completeButtonMessage: String {
+        guard let serviceDate = parseServiceDate() else {
+            return "Invalid date format"
+        }
+        
+        let calendar = Calendar.current
+        if calendar.isDateInToday(serviceDate) {
+            return "Mark as completed"
+        } else if serviceDate > Date() {
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateStyle = .medium
+            return "Available on \(dateFormatter.string(from: serviceDate))"
+        } else {
+            return "Service date has passed"
+        }
+    }
+    
     var body: some View {
         VStack(spacing: 24) {
             Spacer().frame(height: 1) // Add vertical space at the top
@@ -84,23 +136,36 @@ struct ServiceRequestDetailView: View {
                 
                 // Complete Service Button
                 Button(action: {
-                    isConfirming = true
+                    if isServiceDateToday {
+                        isConfirming = true
+                    }
                 }) {
                     HStack(spacing: 8) {
-                        Image(systemName: "checkmark.circle.fill")
+                        Image(systemName: isServiceDateToday ? "checkmark.circle.fill" : "clock.badge.checkmark")
                             .font(.subheadline)
-                        Text("Complete")
+                        Text(isServiceDateToday ? "Complete" : "Complete")
                             .font(.subheadline.weight(.semibold))
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color.green)
+                    .background(isServiceDateToday ? Color.green : Color.gray)
                     .foregroundColor(.white)
                     .cornerRadius(14)
+                    .opacity(isServiceDateToday ? 1.0 : 0.6)
                 }
+                .disabled(!isServiceDateToday)
             }
             .padding(.horizontal)
             .padding(.top, 8)
+            
+            // Helper text for Complete button
+            if !isServiceDateToday {
+                Text(completeButtonMessage)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            }
 
             Spacer()
         }
