@@ -1,4 +1,5 @@
 import SwiftUI
+import MapKit
 
 struct ServiceRequestDetailView: View {
     let serviceRequest: DataController.ServiceRequest
@@ -62,17 +63,41 @@ struct ServiceRequestDetailView: View {
             .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
             .padding(.horizontal)
 
-            // Complete Service Button
-            Button(action: {
-                isConfirming = true
-            }) {
-                Text("Complete Service")
-                    .font(.headline)
+            // Action Buttons
+            HStack(spacing: 12) {
+                // View on Map Button
+                Button(action: {
+                    openInMaps()
+                }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "map.fill")
+                            .font(.subheadline)
+                        Text("Get Directions")
+                            .font(.subheadline.weight(.semibold))
+                    }
                     .frame(maxWidth: .infinity)
                     .padding()
                     .background(Color.blue)
                     .foregroundColor(.white)
                     .cornerRadius(14)
+                }
+                
+                // Complete Service Button
+                Button(action: {
+                    isConfirming = true
+                }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.subheadline)
+                        Text("Complete")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.green)
+                    .foregroundColor(.white)
+                    .cornerRadius(14)
+                }
             }
             .padding(.horizontal)
             .padding(.top, 8)
@@ -92,6 +117,25 @@ struct ServiceRequestDetailView: View {
             }
         } message: {
             Text("Are you sure you want to mark this service as completed?")
+        }
+    }
+    
+    // Function to open Apple Maps with directions
+    private func openInMaps() {
+        let destination = serviceRequest.location
+        
+        // Create URL for Apple Maps with directions
+        let encodedDestination = destination.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        
+        if let url = URL(string: "maps://?daddr=\(encodedDestination)&dirflg=d") {
+            if UIApplication.shared.canOpenURL(url) {
+                UIApplication.shared.open(url, options: [:], completionHandler: nil)
+            } else {
+                // Fallback to web-based Apple Maps
+                if let webUrl = URL(string: "https://maps.apple.com/?daddr=\(encodedDestination)&dirflg=d") {
+                    UIApplication.shared.open(webUrl, options: [:], completionHandler: nil)
+                }
+            }
         }
     }
 }

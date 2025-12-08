@@ -680,13 +680,24 @@ class DataController: ObservableObject {
         print("💰 Calculated amount: \(amount) based on area: \(request.area)")
         
         // Create a new service request
+        // Map BookingType to ServiceType correctly:
+        // - .coEquip → .coequip
+        // - .individual, .prebooking, .onDemand → .individual
+        let serviceType: ServiceType
+        switch request.type {
+        case .coEquip:
+            serviceType = .coequip
+        case .individual, .prebooking, .onDemand:
+            serviceType = .individual
+        }
+        
         let serviceRequest = ServiceRequest(
             id: UUID(),  // Generate new UUID
             equipmentname: request.equipmentId ?? UUID(),
             farmerid: request.userId ?? UUID(),
             date: request.requestedDate,
             status: .inProgress,  // Set status as inProgress when accepting
-            type: request.type == .coEquip ? .coequip : .individual,
+            type: serviceType,
             area: request.area,
             timeslot: request.timeSlot,
             timeperiod: request.timePeriod ?? "",
@@ -1361,13 +1372,24 @@ class DataController: ObservableObject {
         print("💰 Calculated amount: \(amount) based on area: \(booking.fieldArea)")
         
         // Create a new service request
+        // Map BookingType to ServiceType correctly:
+        // - .coEquip → .coequip
+        // - .individual, .prebooking, .onDemand → .individual
+        let serviceType: ServiceType
+        switch booking.bookingType {
+        case .coEquip:
+            serviceType = .coequip
+        case .individual, .prebooking, .onDemand:
+            serviceType = .individual
+        }
+        
         let serviceRequest = ServiceRequest(
             id: UUID(),  // Generate new UUID
             equipmentname: booking.equipmentId ?? UUID(),
             farmerid: booking.userId ?? UUID(),
             date: "\(booking.bookingDate)",
             status: .inProgress,  // Set status as inProgress when accepting
-            type: booking.bookingType == .prebooking ? .individual : .coequip,
+            type: serviceType,
             area: booking.fieldArea,
             timeslot: booking.timeSlot,
             timeperiod:"",
