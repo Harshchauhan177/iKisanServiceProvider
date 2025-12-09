@@ -1383,11 +1383,17 @@ class DataController: ObservableObject {
             serviceType = .individual
         }
         
+        // Format the booking date properly to avoid timezone issues
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+        dateFormatter.timeZone = TimeZone.current
+        let formattedDate = dateFormatter.string(from: booking.bookingDate)
+        
         let serviceRequest = ServiceRequest(
             id: UUID(),  // Generate new UUID
             equipmentname: booking.equipmentId ?? UUID(),
             farmerid: booking.userId ?? UUID(),
-            date: "\(booking.bookingDate)",
+            date: formattedDate,
             status: .inProgress,  // Set status as inProgress when accepting
             type: serviceType,
             area: booking.fieldArea,
