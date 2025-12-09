@@ -71,14 +71,29 @@ struct MyEquipmentView: View {
                         Image(systemName: "wrench.and.screwdriver")
                             .font(.system(size: 64))
                             .foregroundColor(.secondary)
+                        
                         VStack(spacing: 8) {
                             Text("No equipment added yet")
                                 .font(.title3)
                                 .fontWeight(.semibold)
-                            Text("Tap + to add your first equipment")
+                            Text("Start listing your equipment to connect with farmers")
                                 .font(.body)
                                 .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
                         }
+                        
+                        Button(action: {
+                            showingAddEquipment = true
+                        }) {
+                            Label("Add Equipment", systemImage: "plus.circle.fill")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .frame(maxWidth: 200)
+                                .padding(.vertical, 12)
+                                .background(Color.blue)
+                                .cornerRadius(12)
+                        }
+                        .padding(.top, 8)
                     }
                     .padding()
                 } else {

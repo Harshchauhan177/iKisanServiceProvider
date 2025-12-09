@@ -10,6 +10,14 @@ import SwiftUI
 struct AppInfoView: View {
     private let ikisanGreen = Color(red: 0.298, green: 0.498, blue: 0.345)
     
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+    }
+    
+    private var buildNumber: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+    }
+    
     var body: some View {
         List {
             Section {
@@ -26,7 +34,7 @@ struct AppInfoView: View {
                             .font(.largeTitle)
                             .fontWeight(.bold)
                         
-                        Text("Version 1.0.0 (Build 42)")
+                        Text("Version \(appVersion) (Build \(buildNumber))")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                     }

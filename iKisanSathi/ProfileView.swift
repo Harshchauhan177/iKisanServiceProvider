@@ -119,7 +119,7 @@ struct ProfileView: View {
                                     .padding(.top, 2)
                                     .padding(.horizontal)
                             } else {
-                                Text(userProfile?.location ?? dataController.currentProducer?.location ?? "123 Farmland Road, Agricultural Valley, AV 12345")
+                                Text(userProfile?.location ?? dataController.currentProducer?.location ?? "Location not set")
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
                                     .multilineTextAlignment(.center)
@@ -142,10 +142,6 @@ struct ProfileView: View {
                             .padding(.horizontal)
                             .padding(.bottom, 8)
                     VStack(alignment: .leading, spacing: 16) {
-//                        Text("Account Details")
-//                            .font(.title2)
-//                            .fontWeight(.bold)
-//                            .padding(.bottom, 4)
                         
                         // Rating
 //                        HStack {

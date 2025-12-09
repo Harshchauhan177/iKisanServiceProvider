@@ -100,6 +100,7 @@ struct ServiceRequestRow: View {
     let request: DataController.ServiceRequest
     let equipment: DataController.Equipment?
     @State private var isLoading = false
+    @State private var showMapError = false
     
     // Helper to get time slot display name
     private var timeSlotText: String {
@@ -300,9 +301,17 @@ struct ServiceRequestRow: View {
             } else {
                 // Fallback to web-based Apple Maps if app is not available
                 if let webUrl = URL(string: "https://maps.apple.com/?daddr=\(encodedDestination)&dirflg=d") {
-                    UIApplication.shared.open(webUrl, options: [:], completionHandler: nil)
+                    UIApplication.shared.open(webUrl, options: [:]) { success in
+                        if !success {
+                            showMapError = true
+                        }
+                    }
+                } else {
+                    showMapError = true
                 }
             }
+        } else {
+            showMapError = true
         }
     }
     
@@ -318,6 +327,11 @@ struct ServiceRequestRow: View {
                 .foregroundColor(.primary)
         }
         .font(.subheadline)
+        .alert("Unable to Open Maps", isPresented: $showMapError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("Please ensure Apple Maps is installed on your device.")
+        }
     }
 }
 

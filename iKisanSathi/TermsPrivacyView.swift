@@ -12,7 +12,7 @@ struct TermsPrivacyView: View {
         List {
             Section(header: Text("Terms of Service").font(.headline).foregroundColor(.primary)) {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Last Updated: July 25, 2025")
+                    Text("Last Updated: December 9, 2024")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.leading)
@@ -169,7 +169,7 @@ struct TermsPrivacyView: View {
             
             Section(header: Text("Privacy Policy").font(.headline).foregroundColor(.primary)) {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Last Updated: July 25, 2025")
+                    Text("Last Updated: December 9, 2024")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.leading)
