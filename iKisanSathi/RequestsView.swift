@@ -4,7 +4,10 @@ import SDWebImageSwiftUI
 struct RequestsView: View {
     @EnvironmentObject var dataController: DataController
     @State private var isLoading = true
-    @State private var selectedRequestType = 0 // 0 for Co-Equip, 1 for Booking
+    @State private var selectedRequestType = 0 // 0 for Individual, 1 for Co-Equip
+    @State private var loadTask: Task<Void, Never>? = nil
+    @State private var errorMessage: String?
+    @State private var showError = false
     
     var filteredRequests: [Request] {
         dataController.producerRequests.filter { request in
@@ -105,19 +108,68 @@ struct RequestsView: View {
         }
         .navigationTitle("New Requests")
         .navigationBarTitleDisplayMode(.inline)
-        .task {
-            isLoading = true
-            await loadData()
-            isLoading = false
+        .alert("Error Loading Data", isPresented: $showError) {
+            Button("OK", role: .cancel) { }
+            Button("Retry") {
+                Task {
+                    await loadData()
+                }
+            }
+        } message: {
+            if let errorMessage = errorMessage {
+                Text(errorMessage)
+            }
+        }
+        .task(id: dataController.currentUser?.id) {
+            // Cancel previous load task if it exists
+            loadTask?.cancel()
+            
+            // Only load if not already loaded or if user changed
+            loadTask = Task {
+                isLoading = true
+                await loadData()
+                isLoading = false
+            }
+        }
+        .onDisappear {
+            // Clean up task when view disappears to prevent unnecessary work
+            loadTask?.cancel()
         }
     }
     
     private func loadData() async {
+        // Check if task was cancelled before proceeding
+        guard !Task.isCancelled else { return }
+        
+        // Skip if data was recently loaded (within last 5 seconds)
+        // This prevents redundant fetches when view appears after session restore
+        if !dataController.producerEquipment.isEmpty {
+            print("ℹ️ RequestsView: Equipment already loaded, skipping fetch")
+            return
+        }
+        
         do {
             try await dataController.fetchProducerEquipmentAndRequests()
+            
+            // Check again before second fetch
+            guard !Task.isCancelled else { return }
+            
             try await dataController.fetchBookings()
+            
+            // Clear any previous errors on success
+            await MainActor.run {
+                errorMessage = nil
+                showError = false
+            }
         } catch {
-            print("Error fetching data: \(error)")
+            // Only show error if not cancelled
+            if !Task.isCancelled {
+                await MainActor.run {
+                    errorMessage = "Unable to load requests. Please check your connection and try again."
+                    showError = true
+                }
+                print("Error fetching data: \(error)")
+            }
         }
     }
     
@@ -304,6 +356,8 @@ struct RequestRow: View {
                     .background(Color.blue)
                     .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
+                .accessibilityLabel("View location in Maps")
+                .accessibilityHint("Opens Apple Maps with directions to the request location")
                 
                 Divider()
                 
@@ -335,6 +389,8 @@ struct RequestRow: View {
                         .shadow(color: (isProcessing ? Color.gray : Color.green).opacity(0.3), radius: 4, x: 0, y: 2)
                     }
                     .disabled(isProcessing)
+                    .accessibilityLabel(isProcessing ? "Processing request" : "Accept request")
+                    .accessibilityHint(isProcessing ? "" : "Accept this service request")
                     
                     // Delete Button
                     Button(action: {
@@ -362,6 +418,8 @@ struct RequestRow: View {
                         .shadow(color: (isProcessing ? Color.gray : Color.red).opacity(0.3), radius: 4, x: 0, y: 2)
                     }
                     .disabled(isProcessing)
+                    .accessibilityLabel(isProcessing ? "Processing request" : "Decline request")
+                    .accessibilityHint(isProcessing ? "" : "Decline this service request")
                 }
             }
         }
@@ -599,6 +657,8 @@ struct BookingRow: View {
                     .background(Color.blue)
                     .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
+                .accessibilityLabel("View location in Maps")
+                .accessibilityHint("Opens Apple Maps with directions to the booking location")
                 
                 Divider()
                 
@@ -630,6 +690,8 @@ struct BookingRow: View {
                         .shadow(color: (isProcessing ? Color.gray : Color.green).opacity(0.3), radius: 4, x: 0, y: 2)
                     }
                     .disabled(isProcessing)
+                    .accessibilityLabel(isProcessing ? "Processing booking" : "Accept booking")
+                    .accessibilityHint(isProcessing ? "" : "Accept this booking request")
                     
                     // Delete Button
                     Button(action: {
@@ -657,6 +719,8 @@ struct BookingRow: View {
                         .shadow(color: (isProcessing ? Color.gray : Color.red).opacity(0.3), radius: 4, x: 0, y: 2)
                     }
                     .disabled(isProcessing)
+                    .accessibilityLabel(isProcessing ? "Processing booking" : "Decline booking")
+                    .accessibilityHint(isProcessing ? "" : "Decline this booking request")
                 }
             }
         }

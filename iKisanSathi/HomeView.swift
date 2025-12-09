@@ -95,6 +95,8 @@ struct HomeView: View {
     @State private var searchText = ""
     @Binding var selectedTab: Int
     @State private var showingAddEquipment = false
+    @State private var isInitialLoadComplete = false
+    @State private var isRefreshing = false
     
     var body: some View {
         NavigationStack {
@@ -195,8 +197,33 @@ struct HomeView: View {
                         
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 12) {
-                                ForEach(Array(dataController.equipmentDetails.values.prefix(5)), id: \.equipmentID) { equipment in
-                                    TopEquipmentCard(equipment: equipment)
+                                if dataController.equipmentDetails.isEmpty && !isInitialLoadComplete {
+                                    // Loading state
+                                    ForEach(0..<3, id: \.self) { _ in
+                                        TopEquipmentCardPlaceholder()
+                                    }
+                                } else if dataController.equipmentDetails.isEmpty {
+                                    // Empty state
+                                    VStack(spacing: 16) {
+                                        Image(systemName: "wrench.and.screwdriver")
+                                            .font(.system(size: 48))
+                                            .foregroundColor(.secondary)
+                                        VStack(spacing: 4) {
+                                            Text("No equipment yet")
+                                                .font(.headline)
+                                                .foregroundColor(.primary)
+                                            Text("Add equipment to get started")
+                                                .font(.subheadline)
+                                                .foregroundColor(.secondary)
+                                        }
+                                    }
+                                    .frame(width: 250, height: 180)
+                                    .background(Color(.secondarySystemGroupedBackground))
+                                    .cornerRadius(16)
+                                } else {
+                                    ForEach(Array(dataController.equipmentDetails.values.prefix(5)), id: \.equipmentID) { equipment in
+                                        TopEquipmentCard(equipment: equipment)
+                                    }
                                 }
                             }
                             .padding(.horizontal)
@@ -222,126 +249,133 @@ struct HomeView: View {
                         
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 12) {
-                                let sortedRequests = dataController.serviceRequests
-                                    .filter { request in
-                                        // Filter for today's requests
-                                        let formatter = DateFormatter()
-                                        formatter.dateFormat = "yyyy-MM-dd"
-                                        let requestDate = formatter.date(from: String(request.date.prefix(10))) ?? Date()
-                                        return Calendar.current.isDateInToday(requestDate)
+                                if !isInitialLoadComplete {
+                                    // Loading state
+                                    ForEach(0..<2, id: \.self) { _ in
+                                        ServiceRequestCardPlaceholder()
                                     }
-                                    .sorted { request1, request2 in
-                                        // Sort by time remaining
-                                        let formatter = DateFormatter()
-                                        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
-                                        let date1 = formatter.date(from: request1.date) ?? Date()
-                                        let date2 = formatter.date(from: request2.date) ?? Date()
-                                        return date1 < date2
-                                    }
-                                    .prefix(3)
-                                
-                                if sortedRequests.isEmpty {
-                                    VStack(spacing: 16) {
-                                        Image(systemName: "calendar.badge.clock")
-                                            .font(.system(size: 48))
-                                            .foregroundColor(.secondary)
-                                        VStack(spacing: 4) {
-                                            Text("No active requests for today")
-                                                .font(.headline)
-                                                .foregroundColor(.primary)
-                                            Text("Total requests: \(dataController.serviceRequests.count)")
-                                                .font(.subheadline)
-                                                .foregroundColor(.secondary)
-                                        }
-                                    }
-                                    .frame(width: UIScreen.main.bounds.width - 32, height: 160)
-                                    .background(Color(.secondarySystemGroupedBackground))
-                                    .cornerRadius(16)
                                 } else {
-                                    ForEach(Array(sortedRequests), id: \.id) { request in
-                                        NavigationLink(destination: ServiceRequestDetailView(serviceRequest: request)) {
-                                            VStack(alignment: .leading, spacing: 16) {
-                                                HStack(spacing: 12) {
-                                                    // Equipment Image
-                                                    if let equipment = dataController.equipmentDetails[request.equipmentname],
-                                                       let url = URL(string: equipment.equipmentImage) {
-                                                        WebImage(url: url)
-                                                            .resizable()
-                                                            .scaledToFill()
-                                                            .frame(width: 80, height: 80)
-                                                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                                                    } else {
-                                                        RoundedRectangle(cornerRadius: 12)
-                                                            .fill(Color.gray.opacity(0.1))
-                                                            .frame(width: 80, height: 80)
-                                                            .overlay(
-                                                                Image(systemName: "photo")
-                                                                    .foregroundColor(.gray)
-                                                            )
-                                                    }
-                                                    
-                                                    // Equipment Details
-                                                    VStack(alignment: .leading, spacing: 6) {
-                                                        if let equipment = dataController.equipmentDetails[request.equipmentname] {
-                                                            Text(equipment.name)
-                                                                .font(.headline)
-                                                                .foregroundColor(.primary)
-                                                                .lineLimit(1)
-                                                            
-                                                            HStack {
-                                                                Image(systemName: "wrench.and.screwdriver.fill")
-                                                                    .foregroundColor(.blue)
-                                                                    .font(.system(size: 12))
-                                                                Text(equipment.type)
-                                                                    .font(.subheadline)
-                                                                    .foregroundColor(.secondary)
-                                                            }
-                                                            
-                                                            HStack {
-                                                                Image(systemName: "ruler.fill")
-                                                                    .foregroundColor(.green)
-                                                                    .font(.system(size: 12))
-                                                                Text("\(String(format: "%.1f", request.area)) acres")
-                                                                    .font(.subheadline)
-                                                                    .foregroundColor(.secondary)
+                                    let sortedRequests = dataController.serviceRequests
+                                        .filter { request in
+                                            // Filter for today's requests
+                                            let formatter = DateFormatter()
+                                            formatter.dateFormat = "yyyy-MM-dd"
+                                            let requestDate = formatter.date(from: String(request.date.prefix(10))) ?? Date()
+                                            return Calendar.current.isDateInToday(requestDate)
+                                        }
+                                        .sorted { request1, request2 in
+                                            // Sort by time remaining
+                                            let formatter = DateFormatter()
+                                            formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+                                            let date1 = formatter.date(from: request1.date) ?? Date()
+                                            let date2 = formatter.date(from: request2.date) ?? Date()
+                                            return date1 < date2
+                                        }
+                                        .prefix(3)
+                                    
+                                    if sortedRequests.isEmpty {
+                                        VStack(spacing: 16) {
+                                            Image(systemName: "calendar.badge.clock")
+                                                .font(.system(size: 48))
+                                                .foregroundColor(.secondary)
+                                            VStack(spacing: 4) {
+                                                Text("No active requests for today")
+                                                    .font(.headline)
+                                                    .foregroundColor(.primary)
+                                                Text("Total requests: \(dataController.serviceRequests.count)")
+                                                    .font(.subheadline)
+                                                    .foregroundColor(.secondary)
+                                            }
+                                        }
+                                        .frame(width: UIScreen.main.bounds.width - 32, height: 160)
+                                        .background(Color(.secondarySystemGroupedBackground))
+                                        .cornerRadius(16)
+                                    } else {
+                                        ForEach(Array(sortedRequests), id: \.id) { request in
+                                            NavigationLink(destination: ServiceRequestDetailView(serviceRequest: request)) {
+                                                VStack(alignment: .leading, spacing: 16) {
+                                                    HStack(spacing: 12) {
+                                                        // Equipment Image
+                                                        if let equipment = dataController.equipmentDetails[request.equipmentname],
+                                                           let url = URL(string: equipment.equipmentImage) {
+                                                            WebImage(url: url)
+                                                                .resizable()
+                                                                .scaledToFill()
+                                                                .frame(width: 80, height: 80)
+                                                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                                        } else {
+                                                            RoundedRectangle(cornerRadius: 12)
+                                                                .fill(Color.gray.opacity(0.1))
+                                                                .frame(width: 80, height: 80)
+                                                                .overlay(
+                                                                    Image(systemName: "photo")
+                                                                        .foregroundColor(.gray)
+                                                                )
+                                                        }
+                                                        
+                                                        // Equipment Details
+                                                        VStack(alignment: .leading, spacing: 6) {
+                                                            if let equipment = dataController.equipmentDetails[request.equipmentname] {
+                                                                Text(equipment.name)
+                                                                    .font(.headline)
+                                                                    .foregroundColor(.primary)
+                                                                    .lineLimit(1)
+                                                                
+                                                                HStack {
+                                                                    Image(systemName: "wrench.and.screwdriver.fill")
+                                                                        .foregroundColor(.blue)
+                                                                        .font(.system(size: 12))
+                                                                    Text(equipment.type)
+                                                                        .font(.subheadline)
+                                                                        .foregroundColor(.secondary)
+                                                                }
+                                                                
+                                                                HStack {
+                                                                    Image(systemName: "ruler.fill")
+                                                                        .foregroundColor(.green)
+                                                                        .font(.system(size: 12))
+                                                                    Text("\(String(format: "%.1f", request.area)) acres")
+                                                                        .font(.subheadline)
+                                                                        .foregroundColor(.secondary)
+                                                                }
                                                             }
                                                         }
+                                                        Spacer()
                                                     }
-                                                    Spacer()
+                
+                                                    // Time and Date Section
+                                                    HStack {
+                                                        // Date
+                                                        HStack(spacing: 6) {
+                                                            Image(systemName: "calendar")
+                                                                .foregroundColor(.blue)
+                                                                .font(.system(size: 14))
+                                                            let date = String(request.date.prefix(10))
+                                                            Text(date)
+                                                                .font(.subheadline)
+                                                                .foregroundColor(.primary)
+                                                        }
+                                                        
+                                                        Spacer()
+                                                        
+                                                        // Time
+                                                        HStack(spacing: 6) {
+                                                            Image(systemName: "clock.fill")
+                                                                .foregroundColor(.orange)
+                                                                .font(.system(size: 14))
+                                                            Text(request.timeslot.rawValue)
+                                                                .font(.subheadline)
+                                                                .foregroundColor(.primary)
+                                                        }
+                                                    }
+                                                    .padding(.top, 4)
                                                 }
-            
-                                                // Time and Date Section
-                                                HStack {
-                                                    // Date
-                                                    HStack(spacing: 6) {
-                                                        Image(systemName: "calendar")
-                                                            .foregroundColor(.blue)
-                                                            .font(.system(size: 14))
-                                                        let date = String(request.date.prefix(10))
-                                                        Text(date)
-                                                            .font(.subheadline)
-                                                            .foregroundColor(.primary)
-                                                    }
-                                                    
-                                                    Spacer()
-                                                    
-                                                    // Time
-                                                    HStack(spacing: 6) {
-                                                        Image(systemName: "clock.fill")
-                                                            .foregroundColor(.orange)
-                                                            .font(.system(size: 14))
-                                                        Text(request.timeslot.rawValue)
-                                                            .font(.subheadline)
-                                                            .foregroundColor(.primary)
-                                                    }
-                                                }
-                                                .padding(.top, 4)
+                                                .padding(16)
+                                                .frame(width: UIScreen.main.bounds.width - 32)
+                                                .background(Color(.systemBackground))
+                                                .cornerRadius(16)
+                                                .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 2)
                                             }
-                                            .padding(16)
-                                            .frame(width: UIScreen.main.bounds.width - 32)
-                                            .background(Color(.systemBackground))
-                                            .cornerRadius(16)
-                                            .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 2)
                                         }
                                     }
                                 }
@@ -399,15 +433,81 @@ struct HomeView: View {
             .navigationDestination(isPresented: $isIncomeAnalysisActive) {
                 MonthlyIncomeView()
             }
-            .task {
-                do {
-                    try await dataController.fetchServiceRequests()
-                    print("Fetched \(dataController.serviceRequests.count) service requests")
-                } catch {
-                    print("Error fetching service requests: \(error)")
+            .onAppear {
+                // Load data when HomeView appears if not already loaded
+                if !isInitialLoadComplete {
+                    Task {
+                        await loadHomeData()
+                    }
+                }
+            }
+            .onChange(of: selectedTab) { _, newValue in
+                // Refresh data when returning to Home tab
+                if newValue == 0 && isInitialLoadComplete {
+                    Task {
+                        await refreshHomeDataIfNeeded()
+                    }
                 }
             }
             .navigationBarBackButtonHidden(false)
+        }
+    }
+    
+    private func loadHomeData() async {
+        guard !isRefreshing else { return }
+        isRefreshing = true
+        
+        do {
+            // Load equipment first, then service requests (in proper order)
+            try await dataController.fetchProducerEquipmentAndRequests()
+            // Small delay to ensure equipment data is set before fetching service requests
+            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
+            try await dataController.fetchServiceRequests()
+            
+            await MainActor.run {
+                isInitialLoadComplete = true
+                isRefreshing = false
+            }
+            print("✅ Home data loaded successfully")
+        } catch {
+            print("❌ Error loading home data: \(error)")
+            await MainActor.run {
+                isRefreshing = false
+            }
+        }
+    }
+    
+    private func refreshHomeDataIfNeeded() async {
+        guard !isRefreshing else { return }
+        
+        // Only refresh if data is stale (more than 30 seconds old)
+        // This prevents unnecessary API calls while being responsive
+        let lastRefreshKey = "lastHomeRefresh"
+        let now = Date()
+        
+        if let lastRefresh = UserDefaults.standard.object(forKey: lastRefreshKey) as? Date,
+           now.timeIntervalSince(lastRefresh) < 30 {
+            print("ℹ️ Skipping refresh - data is still fresh")
+            return
+        }
+        
+        isRefreshing = true
+        UserDefaults.standard.set(now, forKey: lastRefreshKey)
+        
+        do {
+            try await dataController.fetchProducerEquipmentAndRequests()
+            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
+            try await dataController.fetchServiceRequests()
+            
+            await MainActor.run {
+                isRefreshing = false
+            }
+            print("✅ Home data refreshed successfully")
+        } catch {
+            print("❌ Error refreshing home data: \(error)")
+            await MainActor.run {
+                isRefreshing = false
+            }
         }
     }
     
@@ -557,5 +657,89 @@ struct TopEquipmentCard: View {
         } message: {
             Text(errorMessage)
         }
+    }
+}
+
+// Placeholder view for loading state
+struct TopEquipmentCardPlaceholder: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.gray.opacity(0.2))
+                .frame(width: 180, height: 180)
+            
+            VStack(alignment: .leading, spacing: 8) {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color.gray.opacity(0.2))
+                    .frame(width: 120, height: 16)
+                
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.gray.opacity(0.2))
+                            .frame(width: 50, height: 12)
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.gray.opacity(0.2))
+                            .frame(width: 40, height: 14)
+                    }
+                    Spacer()
+                    VStack(alignment: .leading, spacing: 4) {
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.gray.opacity(0.2))
+                            .frame(width: 50, height: 12)
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.gray.opacity(0.2))
+                            .frame(width: 40, height: 14)
+                    }
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 12)
+        }
+        .frame(width: 180)
+        .background(Color(.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 2)
+    }
+}
+
+// Placeholder view for service request card
+struct ServiceRequestCardPlaceholder: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 12) {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.gray.opacity(0.2))
+                    .frame(width: 80, height: 80)
+                
+                VStack(alignment: .leading, spacing: 6) {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.gray.opacity(0.2))
+                        .frame(width: 140, height: 16)
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.gray.opacity(0.2))
+                        .frame(width: 100, height: 14)
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.gray.opacity(0.2))
+                        .frame(width: 80, height: 14)
+                }
+                Spacer()
+            }
+            
+            HStack {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color.gray.opacity(0.2))
+                    .frame(width: 100, height: 14)
+                Spacer()
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color.gray.opacity(0.2))
+                    .frame(width: 80, height: 14)
+            }
+        }
+        .padding(16)
+        .frame(width: UIScreen.main.bounds.width - 32)
+        .background(Color(.systemBackground))
+        .cornerRadius(16)
+        .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 2)
     }
 }

@@ -5,6 +5,7 @@ import MapKit
 struct ServiceRequestsView: View {
     @EnvironmentObject var dataController: DataController
     @State private var isLoading = true
+    @State private var loadTask: Task<Void, Never>?
     
     private var inProgressRequests: [DataController.ServiceRequest] {
         dataController.serviceRequests.filter { $0.status == .inProgress }
@@ -51,23 +52,46 @@ struct ServiceRequestsView: View {
         .background(Color(.systemGray6).ignoresSafeArea())
         .navigationTitle("In Progress Requests")
         .navigationBarTitleDisplayMode(.inline)
-        .task {
-            isLoading = true
-            do {
-                try await dataController.fetchServiceRequests()
-            } catch {
-                print("Error fetching service requests: \(error)")
+        .task(id: dataController.currentUser?.id) {
+            // Cancel previous task
+            loadTask?.cancel()
+            
+            loadTask = Task {
+                await loadData()
             }
-            isLoading = false
+        }
+        .onDisappear {
+            loadTask?.cancel()
         }
     }
     
+    private func loadData() async {
+        // Skip if cancelled
+        guard !Task.isCancelled else { return }
+        
+        // Show loading only if no requests cached
+        if dataController.serviceRequests.isEmpty {
+            isLoading = true
+        }
+        
+        do {
+            try await dataController.fetchServiceRequests()
+        } catch {
+            if !Task.isCancelled {
+                print("Error fetching service requests: \(error)")
+            }
+        }
+        isLoading = false
+    }
+    
     private func refreshData() async {
+        isLoading = true
         do {
             try await dataController.refreshAllData()
         } catch {
             print("Error refreshing service requests: \(error)")
         }
+        isLoading = false
     }
 }
 

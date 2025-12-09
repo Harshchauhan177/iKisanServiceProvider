@@ -2,6 +2,7 @@ import SwiftUI
 
 struct HistoryView: View {
     @EnvironmentObject var dataController: DataController
+    @State private var loadTask: Task<Void, Never>?
     
     var body: some View {
         NavigationStack {
@@ -31,12 +32,25 @@ struct HistoryView: View {
                 }
             }
             .navigationTitle("Service History")
-            .task {
-                do {
-                    try await dataController.fetchCompletedServiceRequests()
-                } catch {
-                    print("Error fetching completed requests: \(error)")
+            .task(id: dataController.currentUser?.id) {
+                // Cancel previous task
+                loadTask?.cancel()
+                
+                loadTask = Task {
+                    // Skip if cancelled
+                    guard !Task.isCancelled else { return }
+                    
+                    do {
+                        try await dataController.fetchCompletedServiceRequests()
+                    } catch {
+                        if !Task.isCancelled {
+                            print("Error fetching completed requests: \(error)")
+                        }
+                    }
                 }
+            }
+            .onDisappear {
+                loadTask?.cancel()
             }
         }
     }

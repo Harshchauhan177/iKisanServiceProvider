@@ -34,6 +34,18 @@ class DataController: ObservableObject {
     @Published var processingRequests: Set<UUID> = []
     @Published var processingBookings: Set<UUID> = []
     
+    // Track ongoing fetch tasks to prevent redundant calls
+    private var equipmentFetchTask: Task<Void, Error>?
+    private var lastEquipmentFetchTime: Date?
+    private let minimumFetchInterval: TimeInterval = 2.0 // Minimum 2 seconds between fetches
+    private var isFetchingEquipment = false // Flag to prevent concurrent fetches
+    
+    // Cache tracking for other data types
+    private var lastCompletedRequestsFetchTime: Date?
+    private var lastServiceRequestsFetchTime: Date?
+    private var lastBookingsFetchTime: Date?
+    private let minimumDataRefreshInterval: TimeInterval = 5.0 // 5 seconds for other data
+    
     // Shared URLSession for all network requests
     private static let sharedSession: URLSession = {
         let config = URLSessionConfiguration.default
@@ -131,8 +143,9 @@ class DataController: ObservableObject {
             if let session = supabase.auth.currentSession {
                 print("✅ Session restored successfully")
                 
-                // Fetch user data
+                // Fetch user data first
                 try await fetchProducerDetails()
+                // Then fetch equipment (required for other data)
                 try await fetchProducerEquipmentAndRequests()
                 
                 // Reset retry count on success
@@ -143,13 +156,20 @@ class DataController: ObservableObject {
             }
         } catch {
             print("⚠️ Error restoring session (attempt \(sessionRestoreRetryCount + 1)): \(error)")
+            
+            // Don't retry on cancellation errors - these are expected
+            if let nsError = error as? NSError, nsError.code == -999 {
+                print("ℹ️ Session restore cancelled, will not retry")
+                return
+            }
+            
             sessionRestoreRetryCount += 1
             
-            // If it's a network error, retry
-            if (error as NSError).domain == NSURLErrorDomain {
+            // If it's a network error and we haven't exceeded retries, retry
+            if (error as NSError).domain == NSURLErrorDomain && sessionRestoreRetryCount < maxSessionRestoreRetries {
                 await restoreSession()
             } else {
-                // For other errors, clear the session
+                // For other errors or max retries reached, clear the session
                 clearStoredSession()
             }
         }
@@ -267,7 +287,7 @@ class DataController: ObservableObject {
             throw NSError(domain: "DataController", code: 404, userInfo: [NSLocalizedDescriptionKey: "No producer found for this user."])
         }
         
-        DispatchQueue.main.async {
+        await MainActor.run {
             self.currentProducer = producer
         }
     }
@@ -562,80 +582,154 @@ class DataController: ObservableObject {
     @Published var equipmentDetails: [UUID: Equipment] = [:]
     
     func fetchProducerEquipmentAndRequests() async throws {
-        guard let currentUser = currentUser else {
-            print("⚠️ No current user found")
-            throw NSError(domain: "DataController", code: 1, userInfo: [NSLocalizedDescriptionKey: "No user logged in"])
+        // Prevent concurrent fetches - if already fetching, wait for that one to complete
+        if isFetchingEquipment {
+            print("⏳ Equipment fetch already in progress, waiting...")
+            // Wait for the current task to complete
+            if let existingTask = equipmentFetchTask {
+                do {
+                    try await existingTask.value
+                    return
+                } catch is CancellationError {
+                    // If cancelled, proceed with new fetch
+                    print("⚠️ Previous fetch was cancelled, starting new one")
+                } catch {
+                    // Rethrow other errors
+                    throw error
+                }
+            }
         }
         
-        print("🔍 Fetching equipment for user: \(currentUser.id)")
+        // Check if we should throttle this request
+        if let lastFetch = lastEquipmentFetchTime,
+           Date().timeIntervalSince(lastFetch) < minimumFetchInterval {
+            print("⏱️ Throttling equipment fetch - too soon since last fetch (\(String(format: "%.1f", Date().timeIntervalSince(lastFetch)))s ago)")
+            return
+        }
         
-        // First get all equipment for current producer
-        let equipmentResponse = try await supabase.database
-            .from("equipment")
-            .select()
-            .eq("providerID", value: currentUser.id.uuidString)
-            .order("name")  // Order by name for consistent display
-            .execute()
+        // Set fetching flag
+        isFetchingEquipment = true
         
-        print("📦 Equipment response data: \(String(data: equipmentResponse.data, encoding: .utf8) ?? "nil")")
+        // Cancel any ongoing fetch
+        equipmentFetchTask?.cancel()
         
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        
-        do {
-            let equipment = try decoder.decode([Equipment].self, from: equipmentResponse.data)
-            print("🚜 Found \(equipment.count) equipment items")
-            
-            // Create a lookup dictionary for equipment details
-            var equipmentDict: [UUID: Equipment] = [:]
-            let equipmentIds: [String] = equipment.map { equip in
-                equipmentDict[equip.equipmentID] = equip
-                return equip.equipmentID.uuidString
+        // Create new fetch task
+        let task = Task<Void, Error> {
+            guard let currentUser = currentUser else {
+                print("⚠️ No current user found")
+                throw NSError(domain: "DataController", code: 1, userInfo: [NSLocalizedDescriptionKey: "No user logged in"])
             }
             
-            print("🔑 Equipment IDs: \(equipmentIds)")
+            // Check if cancelled
+            try Task.checkCancellation()
             
-            // Then fetch all requests for equipment owned by this producer
-            if !equipmentIds.isEmpty {
-                print("📥 Fetching requests for equipment IDs")
-                let requestsResponse = try await supabase.database
-                    .from("requests")
-                    .select()
-                    .in("equipmentId", values: equipmentIds)
-                    .eq("status", value: "Pending")  // Only fetch pending requests
-                    .execute()
+            print("🔍 Fetching equipment for user: \(currentUser.id)")
+            
+            // First get all equipment for current producer
+            let equipmentResponse = try await supabase.database
+                .from("equipment")
+                .select()
+                .eq("providerID", value: currentUser.id.uuidString)
+                .order("name")  // Order by name for consistent display
+                .execute()
+            
+            // Check if cancelled before processing response
+            try Task.checkCancellation()
+            
+            print("📦 Equipment response data: \(String(data: equipmentResponse.data, encoding: .utf8) ?? "nil")")
+            
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            
+            do {
+                let equipment = try decoder.decode([Equipment].self, from: equipmentResponse.data)
+                print("🚜 Found \(equipment.count) equipment items")
                 
-                print("📬 Requests response data: \(String(data: requestsResponse.data, encoding: .utf8) ?? "nil")")
+                // Check if cancelled
+                try Task.checkCancellation()
                 
-                let requests = try decoder.decode([Request].self, from: requestsResponse.data)
-                print("📝 Found \(requests.count) total requests")
+                // Create a lookup dictionary for equipment details
+                var equipmentDict: [UUID: Equipment] = [:]
+                let equipmentIds: [String] = equipment.map { equip in
+                    equipmentDict[equip.equipmentID] = equip
+                    return equip.equipmentID.uuidString
+                }
                 
-                // Filter requests to only include those for this producer's equipment
-                let producerRequests = requests.filter { request in
-                    guard let equipmentId = request.equipmentId else {
-                        print("⚠️ Request has no equipment ID")
-                        return false
+                print("🔑 Equipment IDs: \(equipmentIds)")
+                
+                // Then fetch all requests for equipment owned by this producer
+                if !equipmentIds.isEmpty {
+                    print("📥 Fetching requests for equipment IDs")
+                    
+                    // Check if cancelled
+                    try Task.checkCancellation()
+                    
+                    let requestsResponse = try await supabase.database
+                        .from("requests")
+                        .select()
+                        .in("equipmentId", values: equipmentIds)
+                        .eq("status", value: "Pending")  // Only fetch pending requests
+                        .execute()
+                    
+                    // Check if cancelled
+                    try Task.checkCancellation()
+                    
+                    print("📬 Requests response data: \(String(data: requestsResponse.data, encoding: .utf8) ?? "nil")")
+                    
+                    let requests = try decoder.decode([Request].self, from: requestsResponse.data)
+                    print("📝 Found \(requests.count) total requests")
+                    
+                    // Filter requests to only include those for this producer's equipment
+                    let producerRequests = requests.filter { request in
+                        guard let equipmentId = request.equipmentId else {
+                            print("⚠️ Request has no equipment ID")
+                            return false
+                        }
+                        return equipmentDict[equipmentId] != nil
                     }
-                    return equipmentDict[equipmentId] != nil
+                    
+                    print("✅ Found \(producerRequests.count) valid requests for producer")
+                    
+                    // Check if cancelled before updating UI
+                    try Task.checkCancellation()
+                    
+                    await MainActor.run {
+                        self.producerRequests = producerRequests
+                        self.producerEquipment = equipment
+                        self.equipmentDetails = equipmentDict
+                        self.lastEquipmentFetchTime = Date()
+                    }
+                } else {
+                    print("ℹ️ No equipment found for producer")
+                    await MainActor.run {
+                        self.producerRequests = []
+                        self.producerEquipment = []
+                        self.equipmentDetails = [:]
+                        self.lastEquipmentFetchTime = Date()
+                    }
                 }
-                
-                print("✅ Found \(producerRequests.count) valid requests for producer")
-                
-                DispatchQueue.main.async {
-                    self.producerRequests = producerRequests
-                    self.producerEquipment = equipment
-                    self.equipmentDetails = equipmentDict
-                }
-            } else {
-                print("ℹ️ No equipment found for producer")
-                DispatchQueue.main.async {
-                    self.producerRequests = []
-                    self.producerEquipment = []
-                    self.equipmentDetails = [:]
-                }
+            } catch {
+                print("❌ Error decoding equipment: \(error)")
+                throw error
             }
+        }
+        
+        // Store the task
+        equipmentFetchTask = task
+        
+        // Ensure flag is cleared when function exits
+        defer {
+            isFetchingEquipment = false
+        }
+        
+        // Wait for completion and handle cancellation
+        do {
+            try await task.value
+        } catch is CancellationError {
+            print("⚠️ Equipment fetch was cancelled")
+            // Don't rethrow cancellation errors
         } catch {
-            print("❌ Error decoding equipment: \(error)")
+            // Rethrow other errors
             throw error
         }
     }
@@ -888,12 +982,26 @@ class DataController: ObservableObject {
     @Published var serviceRequests: [ServiceRequest] = []
     
     func fetchServiceRequests() async throws {
+        // Check cache - skip if recently fetched (within last 5 seconds)
+        if let lastFetch = lastServiceRequestsFetchTime,
+           Date().timeIntervalSince(lastFetch) < minimumDataRefreshInterval,
+           !serviceRequests.isEmpty {
+            print("ℹ️ Using cached service requests (fetched \(String(format: "%.1f", Date().timeIntervalSince(lastFetch)))s ago)")
+            return
+        }
+        
         guard let currentUser = currentUser else {
             print("⚠️ No current user found")
             return
         }
         
         print("🔍 Fetching service requests for current user: \(currentUser.id)")
+        
+        // Ensure equipment is loaded first
+        if producerEquipment.isEmpty {
+            print("⚠️ Producer equipment not loaded yet, fetching equipment first...")
+            try await fetchProducerEquipmentAndRequests()
+        }
         
         // Get all equipment IDs for this producer
         let equipmentIds = producerEquipment.compactMap { equip in
@@ -918,8 +1026,14 @@ class DataController: ObservableObject {
             let requests = try decoder.decode([ServiceRequest].self, from: response.data)
             print("✅ Decoded \(requests.count) service requests")
             
-            DispatchQueue.main.async {
+            await MainActor.run {
                 self.serviceRequests = requests
+                self.lastServiceRequestsFetchTime = Date()
+            }
+        } else {
+            print("ℹ️ No equipment IDs available, clearing service requests")
+            await MainActor.run {
+                self.serviceRequests = []
             }
         }
     }
@@ -955,9 +1069,23 @@ class DataController: ObservableObject {
     @Published var completedServiceRequests: [ServiceRequest] = []
     
     func fetchCompletedServiceRequests() async throws {
+        // Check cache - skip if recently fetched (within last 5 seconds)
+        if let lastFetch = lastCompletedRequestsFetchTime,
+           Date().timeIntervalSince(lastFetch) < minimumDataRefreshInterval,
+           !completedServiceRequests.isEmpty {
+            print("ℹ️ Using cached completed requests (fetched \(String(format: "%.1f", Date().timeIntervalSince(lastFetch)))s ago)")
+            return
+        }
+        
         guard let currentUser = currentUser else {
             print("⚠️ No current user found")
             return
+        }
+        
+        // Ensure equipment is loaded first
+        if producerEquipment.isEmpty {
+            print("⚠️ Equipment not loaded, fetching first...")
+            try await fetchProducerEquipmentAndRequests()
         }
         
         // Get all equipment IDs for this producer
@@ -966,6 +1094,7 @@ class DataController: ObservableObject {
         }
         
         if !equipmentIds.isEmpty {
+            print("🔄 Fetching completed service requests...")
             let response = try await supabase.database
                 .from("servicerequests")
                 .select()
@@ -975,9 +1104,11 @@ class DataController: ObservableObject {
             
             let decoder = JSONDecoder()
             let requests = try decoder.decode([ServiceRequest].self, from: response.data)
+            print("✅ Fetched \(requests.count) completed requests")
             
-            DispatchQueue.main.async {
+            await MainActor.run {
                 self.completedServiceRequests = requests
+                self.lastCompletedRequestsFetchTime = Date()
             }
         }
     }
@@ -1291,33 +1422,56 @@ class DataController: ObservableObject {
     
     // Method to fetch additional images for equipment
     func fetchEquipmentMoreImages(equipmentID: UUID) async throws -> [String] {
-        let response = try await supabase.database
-            .from("equipmentMoreImages")
-            .select("image")
-            .eq("equipmentID", value: equipmentID.uuidString)
-            .execute()
-        
-        // Handle empty response
-        guard !response.data.isEmpty else {
-            print("ℹ️ No additional images found for equipment: \(equipmentID)")
-            return []
-        }
-        
-        let decoder = JSONDecoder()
         do {
-            // Decode using ImageOnly struct since we only selected image field
-            let images = try decoder.decode([ImageOnly].self, from: response.data)
-            print("✅ Decoded \(images.count) additional images")
-            return images.map { $0.image }
+            let response = try await supabase.database
+                .from("equipmentMoreImages")
+                .select("image")
+                .eq("equipmentID", value: equipmentID.uuidString)
+                .execute()
+            
+            // Handle empty response
+            guard !response.data.isEmpty else {
+                print("ℹ️ No additional images found for equipment: \(equipmentID)")
+                return []
+            }
+            
+            let decoder = JSONDecoder()
+            do {
+                // Decode using ImageOnly struct since we only selected image field
+                let images = try decoder.decode([ImageOnly].self, from: response.data)
+                print("✅ Decoded \(images.count) additional images")
+                return images.map { $0.image }
+            } catch {
+                print("⚠️ Failed to decode additional images: \(error)")
+                // If decoding fails, return empty array instead of throwing
+                return []
+            }
+        } catch let error as NSError where error.code == -999 {
+            // Handle cancellation gracefully - this is expected behavior
+            print("ℹ️ Image loading cancelled for equipment: \(equipmentID)")
+            return []
         } catch {
-            print("⚠️ Failed to decode additional images: \(error)")
-            // If decoding fails, return empty array instead of throwing
+            print("⚠️ Failed to fetch additional images: \(error)")
+            // Return empty array for other errors too
             return []
         }
     }
     
     func fetchBookings() async throws {
+        // Check cache - skip if recently fetched (within last 5 seconds)
+        if let lastFetch = lastBookingsFetchTime,
+           Date().timeIntervalSince(lastFetch) < minimumDataRefreshInterval {
+            print("ℹ️ Using cached bookings (fetched \(String(format: "%.1f", Date().timeIntervalSince(lastFetch)))s ago)")
+            return
+        }
+        
         guard let currentUser = currentUser else { return }
+        
+        // Ensure equipment is loaded first
+        if producerEquipment.isEmpty {
+            print("⚠️ Equipment not loaded, fetching first...")
+            try await fetchProducerEquipmentAndRequests()
+        }
         
         // Get all equipment IDs for this producer
         let equipmentIds = producerEquipment.compactMap { $0.equipmentID.uuidString }
@@ -1334,22 +1488,23 @@ class DataController: ObservableObject {
             do {
                 let bookings = try JSONDecoder().decode([Booking].self, from: response.data)
                 print("fetchBookings: Fetched \(bookings.count) pending bookings")
-                DispatchQueue.main.async {
+                await MainActor.run {
                     self.producerBookings = bookings
+                    self.lastBookingsFetchTime = Date()
                 }
             } catch {
                 print("fetchBookings: Error decoding bookings: \(error)")
                 if let responseDataString = String(data: response.data, encoding: .utf8) {
                     print("fetchBookings: Raw response data on error: \(responseDataString)")
                 }
-                DispatchQueue.main.async {
+                await MainActor.run {
                     self.producerBookings = [] 
                 }
             }
             
         } else {
             print("fetchBookings: No equipment IDs found, so no bookings will be fetched.")
-            DispatchQueue.main.async {
+            await MainActor.run {
                 self.producerBookings = []
             }
         }
@@ -1544,10 +1699,11 @@ class DataController: ObservableObject {
     
     // Add refresh functionality for all main data
     func refreshAllData() async throws {
+        // Fetch equipment first, then dependent data
+        try await fetchProducerEquipmentAndRequests()
+        
+        // Then fetch all other data in parallel
         await withThrowingTaskGroup(of: Void.self) { group in
-            group.addTask {
-                try await self.fetchProducerEquipmentAndRequests()
-            }
             group.addTask {
                 try await self.fetchBookings()
             }

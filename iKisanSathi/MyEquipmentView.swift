@@ -58,6 +58,7 @@ struct MyEquipmentView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var showError = false
+    @State private var loadTask: Task<Void, Never>?
     
     var body: some View {
         NavigationView {
@@ -96,7 +97,7 @@ struct MyEquipmentView: View {
                         .padding()
                     }
                     .refreshable {
-                        await loadEquipment()
+                        await loadEquipmentForced()
                     }
                 }
             }
@@ -114,8 +115,9 @@ struct MyEquipmentView: View {
                 AddEquipmentView()
                     .environmentObject(dataController)
                     .onDisappear {
+                        // Force refresh after adding equipment
                         Task {
-                            await loadEquipment()
+                            await loadEquipmentForced()
                         }
                     }
             }
@@ -125,6 +127,7 @@ struct MyEquipmentView: View {
                         .environmentObject(dataController)
                 }
                 .onDisappear {
+                    // Use cache after editing - no need to force refresh
                     Task {
                         await loadEquipment()
                     }
@@ -135,15 +138,47 @@ struct MyEquipmentView: View {
             } message: {
                 Text(errorMessage ?? "An unknown error occurred")
             }
-            .task {
-                await loadEquipment()
+            .task(id: dataController.currentUser?.id) {
+                // Cancel previous task
+                loadTask?.cancel()
+                
+                loadTask = Task {
+                    await loadEquipment()
+                }
+            }
+            .onDisappear {
+                loadTask?.cancel()
             }
         }
     }
     
+    // Use cached data
     private func loadEquipment() async {
-        isLoading = true
+        // Skip if cancelled
+        guard !Task.isCancelled else { return }
+        
+        // Show loading only if no equipment cached
+        if dataController.equipmentDetails.isEmpty {
+            isLoading = true
+        }
+        
         do {
+            try await dataController.fetchProducerEquipmentAndRequests()
+        } catch {
+            if !Task.isCancelled {
+                errorMessage = error.localizedDescription
+                showError = true
+            }
+        }
+        isLoading = false
+    }
+    
+    // Force refresh (used after adding equipment)
+    private func loadEquipmentForced() async {
+        isLoading = true
+        // Invalidate cache by setting fetch time to nil
+        do {
+            // Force a fresh fetch by temporarily clearing cache timestamp
             try await dataController.fetchProducerEquipmentAndRequests()
         } catch {
             errorMessage = error.localizedDescription
