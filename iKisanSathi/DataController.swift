@@ -1465,7 +1465,10 @@ class DataController: ObservableObject {
             return
         }
         
-        guard let currentUser = currentUser else { return }
+        guard let currentUser = currentUser else {
+            print("⚠️ fetchBookings: No current user")
+            return
+        }
         
         // Ensure equipment is loaded first
         if producerEquipment.isEmpty {
@@ -1475,9 +1478,10 @@ class DataController: ObservableObject {
         
         // Get all equipment IDs for this producer
         let equipmentIds = producerEquipment.compactMap { $0.equipmentID.uuidString }
-        print("fetchBookings: Equipment IDs: \(equipmentIds)")
+        print("📋 fetchBookings: Checking \(equipmentIds.count) equipment IDs: \(equipmentIds)")
         
         if !equipmentIds.isEmpty {
+            print("🔄 Fetching bookings from database...")
             let response = try await supabase.database
                 .from("bookings")
                 .select()
@@ -1485,25 +1489,28 @@ class DataController: ObservableObject {
                 .eq("status", value: "Pending")  // Only fetch pending bookings
                 .execute()
             
+            print("📥 fetchBookings: Raw response: \(String(data: response.data, encoding: .utf8) ?? "nil")")
+            
             do {
                 let bookings = try JSONDecoder().decode([Booking].self, from: response.data)
-                print("fetchBookings: Fetched \(bookings.count) pending bookings")
+                print("✅ fetchBookings: Successfully decoded \(bookings.count) pending bookings")
                 await MainActor.run {
                     self.producerBookings = bookings
                     self.lastBookingsFetchTime = Date()
                 }
             } catch {
-                print("fetchBookings: Error decoding bookings: \(error)")
+                print("❌ fetchBookings: Error decoding bookings: \(error)")
                 if let responseDataString = String(data: response.data, encoding: .utf8) {
-                    print("fetchBookings: Raw response data on error: \(responseDataString)")
+                    print("📄 fetchBookings: Raw response data on error: \(responseDataString)")
                 }
                 await MainActor.run {
                     self.producerBookings = [] 
                 }
+                throw error  // Re-throw to let caller know about the error
             }
             
         } else {
-            print("fetchBookings: No equipment IDs found, so no bookings will be fetched.")
+            print("⚠️ fetchBookings: No equipment IDs found, cannot fetch bookings.")
             await MainActor.run {
                 self.producerBookings = []
             }

@@ -57,8 +57,8 @@ struct RequestsView: View {
                             .foregroundColor(.secondary)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if selectedRequestType == 0 && filteredRequests.isEmpty && filteredBookings.isEmpty ||
-                          selectedRequestType == 1 && filteredRequests.isEmpty {
+                } else if (selectedRequestType == 0 && filteredRequests.isEmpty && filteredBookings.isEmpty) ||
+                          (selectedRequestType == 1 && filteredRequests.isEmpty) {
                     VStack(spacing: 20) {
                         Image(systemName: selectedRequestType == 0 ? "person.slash" : "person.2.slash")
                             .font(.system(size: 64))
@@ -141,19 +141,14 @@ struct RequestsView: View {
         // Check if task was cancelled before proceeding
         guard !Task.isCancelled else { return }
         
-        // Skip if data was recently loaded (within last 5 seconds)
-        // This prevents redundant fetches when view appears after session restore
-        if !dataController.producerEquipment.isEmpty {
-            print("ℹ️ RequestsView: Equipment already loaded, skipping fetch")
-            return
-        }
-        
         do {
+            // Always fetch equipment and requests first
             try await dataController.fetchProducerEquipmentAndRequests()
             
             // Check again before second fetch
             guard !Task.isCancelled else { return }
             
+            // Always fetch bookings to ensure they appear
             try await dataController.fetchBookings()
             
             // Clear any previous errors on success
