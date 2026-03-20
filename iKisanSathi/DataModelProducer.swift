@@ -24,6 +24,7 @@ enum BookingStatus: String, Codable {
     case confirmed = "Confirmed"
     case completed = "Completed"
     case cancelled = "cancelled"
+    case awaitingProvider = "awaiting_provider"
 }
 
 enum BookingSource: String, Codable {

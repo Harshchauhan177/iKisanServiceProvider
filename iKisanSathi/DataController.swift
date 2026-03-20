@@ -978,7 +978,43 @@ class DataController: ObservableObject {
             
         }
     }
-    
+
+    // MARK: - CoEquip Request Model
+    struct CoEquipRequest: Codable, Identifiable {
+        let id: UUID
+        let userId: UUID?
+        let equipmentId: UUID?
+        let requestedDate: String
+        let status: String
+        let typeOfRequest: String
+        let area: Double
+        let timeSlot: String
+        let timePeriod: String?
+        let location: String
+        let selectedUsersIds: [String]
+
+        var date: Date? {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+            return formatter.date(from: requestedDate)
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case id
+            case userId
+            case equipmentId
+            case requestedDate
+            case status
+            case typeOfRequest
+            case area
+            case timeSlot
+            case timePeriod
+            case location
+            case selectedUsersIds
+        }
+    }
+
+    @Published var coEquipRequests: [CoEquipRequest] = []
     @Published var serviceRequests: [ServiceRequest] = []
     
     func fetchServiceRequests() async throws {
@@ -1193,7 +1229,122 @@ class DataController: ObservableObject {
         // Fetch updated monthly income
         try await fetchMonthlyIncome()
     }
-    
+
+    // MARK: - Co-Equip Requests
+    func fetchCoEquipRequests() async throws {
+        guard let currentUser = currentUser else {
+            print("⚠️ No current user found")
+            return
+        }
+
+        print("🔍 Fetching Co-Equip requests for provider: \(currentUser.id)")
+
+        // Ensure equipment is loaded first
+        if producerEquipment.isEmpty {
+            print("⚠️ Producer equipment not loaded yet, fetching equipment first...")
+            try await fetchProducerEquipmentAndRequests()
+        }
+
+        // Get all equipment IDs for this producer
+        let equipmentIds = producerEquipment.compactMap { equip in
+            return equip.equipmentID.uuidString
+        }
+
+        print("📱 Producer equipment IDs for Co-Equip: \(equipmentIds)")
+
+        do {
+            if !equipmentIds.isEmpty {
+                // Query requests table for ALL requests on equipment owned by this provider
+                let response = try await supabase.database
+                    .from("requests")
+                    .select("""
+                        id,
+                        "userId",
+                        "equipmentId",
+                        "requestedDate",
+                        status,
+                        "typeOfRequest",
+                        area,
+                        "timeSlot",
+                        "timePeriod",
+                        location,
+                        "selectedUsersIds",
+                        type
+                    """)
+                    .in("equipmentId", values: equipmentIds)
+                    .eq("status", value: "awaiting_provider")
+                    // Include all requests (including own Co-Equip bookings)
+                    .order("requestedDate", ascending: false)
+                    .execute()
+
+                print("📥 Raw Co-Equip requests response: \(String(data: response.data, encoding: .utf8) ?? "nil")")
+
+                let decoder = JSONDecoder()
+                let allRequests = try decoder.decode([Request].self, from: response.data)
+
+                // Filter for Co-Equip requests and convert to CoEquipRequest format
+                let coEquipRequests = allRequests.compactMap { request -> CoEquipRequest? in
+                    guard request.type == .coEquip else { return nil }
+
+                    return CoEquipRequest(
+                        id: request.id,
+                        userId: request.userId,
+                        equipmentId: request.equipmentId,
+                        requestedDate: request.requestedDate,
+                        status: "Pending",
+                        typeOfRequest: request.typeOfRequest.rawValue,
+                        area: request.area,
+                        timeSlot: request.timeSlot.rawValue,
+                        timePeriod: request.timePeriod,
+                        location: request.location,
+                        selectedUsersIds: []
+                    )
+                }
+
+                print("✅ Found \(coEquipRequests.count) Co-Equip requests out of \(allRequests.count) total requests")
+
+                await MainActor.run {
+                    self.coEquipRequests = coEquipRequests
+                }
+            } else {
+                print("ℹ️ No equipment IDs available for Co-Equip requests")
+                await MainActor.run {
+                    self.coEquipRequests = []
+                }
+            }
+        } catch {
+            print("❌ Error fetching Co-Equip requests: \(error)")
+            throw error
+        }
+    }
+
+    // Helper function to fetch user name by ID
+    func fetchUserName(userId: UUID) async throws -> String {
+        let response = try await supabase.database
+            .from("users")
+            .select("name")
+            .eq("id", value: userId.uuidString)
+            .single()
+            .execute()
+
+        if let json = try? JSONSerialization.jsonObject(with: response.data) as? [String: Any],
+           let name = json["name"] as? String {
+            return name
+        }
+        return "Unknown User"
+    }
+
+    // Helper function to fetch participant count for a request
+    func fetchParticipantCount(requestId: UUID) async throws -> Int {
+        let response = try await supabase.database
+            .from("request_participants")
+            .select("*", head: false, count: .exact)
+            .eq("request_id", value: requestId.uuidString)
+            .execute()
+
+        return (response.count ?? 0) + 1 // +1 for the request creator
+    }
+
     func updateEquipment(
         id: UUID,
         name: String,
@@ -1708,7 +1859,7 @@ class DataController: ObservableObject {
     func refreshAllData() async throws {
         // Fetch equipment first, then dependent data
         try await fetchProducerEquipmentAndRequests()
-        
+
         // Then fetch all other data in parallel
         await withThrowingTaskGroup(of: Void.self) { group in
             group.addTask {
@@ -1722,6 +1873,9 @@ class DataController: ObservableObject {
             }
             group.addTask {
                 try await self.fetchMonthlyIncome()
+            }
+            group.addTask {
+                try await self.fetchCoEquipRequests()
             }
         }
     }

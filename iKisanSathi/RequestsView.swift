@@ -10,20 +10,69 @@ struct RequestsView: View {
     @State private var showError = false
     
     var filteredRequests: [Request] {
-        dataController.producerRequests.filter { request in
-            switch selectedRequestType {
-            case 0: return request.type != .coEquip  // Individual/Booking types
-            case 1: return request.type == .coEquip  // Co-Equip
-            default: return false
+        var requests: [Request] = []
+
+        switch selectedRequestType {
+        case 0:
+            // Individual requests - exclude Co-Equip
+            requests = dataController.producerRequests.filter { $0.type != .coEquip }
+        case 1:
+            // Co-Equip requests - include from both sources
+            // First, get Co-Equip requests from producerRequests
+            let producerCoEquipRequests = dataController.producerRequests.filter { $0.type == .coEquip }
+            requests.append(contentsOf: producerCoEquipRequests)
+
+            // Then, convert and add Co-Equip requests from coEquipRequests
+            let convertedCoEquipRequests = dataController.coEquipRequests.compactMap { coEquipRequest -> Request? in
+                // Convert CoEquipRequest to Request
+                guard let userId = coEquipRequest.userId,
+                      let equipmentId = coEquipRequest.equipmentId else {
+                    return nil
+                }
+
+                // Convert string values back to enums
+                let timeSlot: TimeSlot
+                switch coEquipRequest.timeSlot.lowercased() {
+                case "morning": timeSlot = .morning
+                case "afternoon": timeSlot = .afternoon
+                case "evening": timeSlot = .evening
+                default: timeSlot = .morning
+                }
+
+                let requestType: RequestType
+                switch coEquipRequest.typeOfRequest.lowercased() {
+                case "myrequest": requestType = .myRequest
+                case "acceptedrequest": requestType = .joinedRequest
+                default: requestType = .myRequest
+                }
+
+                // Create Request from CoEquipRequest
+                return Request(
+                    id: coEquipRequest.id,
+                    userId: userId,
+                    equipmentId: equipmentId,
+                    requestedDate: coEquipRequest.requestedDate,
+                    status: .pending, // CoEquipRequest status is stored as string "Pending"
+                    type: .coEquip,
+                    area: coEquipRequest.area,
+                    timeSlot: timeSlot,
+                    timePeriod: coEquipRequest.timePeriod,
+                    location: coEquipRequest.location,
+                    typeOfRequest: requestType
+                )
             }
+            requests.append(contentsOf: convertedCoEquipRequests)
+
+        default:
+            break
         }
+
+        return requests
     }
     
     var filteredBookings: [Booking] {
-        if selectedRequestType == 0 {  // Individual requests include bookings
-            return dataController.producerBookings
-        }
-        return []
+        // Include bookings in both Individual and Co-Equip segments
+        return dataController.producerBookings
     }
     
     var body: some View {
@@ -96,6 +145,11 @@ struct RequestsView: View {
                                     RequestRow(request: request, equipment: dataController.equipmentDetails[request.equipmentId ?? UUID()])
                                         .padding(.horizontal)
                                 }
+                                // Also show bookings under Co-Equip
+                                ForEach(filteredBookings) { booking in
+                                    BookingRow(booking: booking, equipment: dataController.equipmentDetails[booking.equipmentId ?? UUID()])
+                                        .padding(.horizontal)
+                                }
                             }
                         }
                         .padding(.vertical)
@@ -140,17 +194,23 @@ struct RequestsView: View {
     private func loadData() async {
         // Check if task was cancelled before proceeding
         guard !Task.isCancelled else { return }
-        
+
         do {
             // Always fetch equipment and requests first
             try await dataController.fetchProducerEquipmentAndRequests()
-            
+
             // Check again before second fetch
             guard !Task.isCancelled else { return }
-            
+
             // Always fetch bookings to ensure they appear
             try await dataController.fetchBookings()
-            
+
+            // Check again before third fetch
+            guard !Task.isCancelled else { return }
+
+            // Fetch Co-Equip requests
+            try await dataController.fetchCoEquipRequests()
+
             // Clear any previous errors on success
             await MainActor.run {
                 errorMessage = nil

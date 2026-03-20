@@ -90,6 +90,7 @@ struct HomeView: View {
     @State private var isServiceRequestsActive = false
     @State private var isRequestsActive = false
     @State private var isIncomeAnalysisActive = false
+    @State private var isCoEquipRequestsActive = false
     @EnvironmentObject var dataController: DataController
     @State private var showingProfile = false
     @State private var searchText = ""
@@ -97,7 +98,11 @@ struct HomeView: View {
     @State private var showingAddEquipment = false
     @State private var isInitialLoadComplete = false
     @State private var isRefreshing = false
-    
+
+    private var pendingCoEquipCount: Int {
+        dataController.coEquipRequests.filter { $0.status == "awaiting_provider" }.count
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -156,7 +161,56 @@ struct HomeView: View {
                     .sheet(isPresented: $showingAddEquipment) {
                         AddEquipmentView()
                     }
-                    
+
+                    // Co-Equip Requests Notification Card
+                    if pendingCoEquipCount > 0 {
+                        Button {
+                            isCoEquipRequestsActive = true
+                        } label: {
+                            HStack(spacing: 16) {
+                                ZStack {
+                                    Circle()
+                                        .fill(Color.orange.opacity(0.15))
+                                        .frame(width: 50, height: 50)
+                                    Image(systemName: "person.2.fill")
+                                        .font(.system(size: 22))
+                                        .foregroundColor(.orange)
+                                }
+
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Co-Equip Booking Requests")
+                                        .font(.headline)
+                                        .foregroundColor(.primary)
+
+                                    Text("\(pendingCoEquipCount) request\(pendingCoEquipCount == 1 ? "" : "s") waiting for your response")
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                }
+
+                                Spacer()
+
+                                Image(systemName: "chevron.right")
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding()
+                            .background(
+                                LinearGradient(
+                                    gradient: Gradient(colors: [Color.orange.opacity(0.1), Color.orange.opacity(0.05)]),
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .cornerRadius(16)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(Color.orange.opacity(0.3), lineWidth: 1.5)
+                            )
+                        }
+                        .accessibilityLabel("Co-Equip Requests")
+                        .accessibilityHint("\(pendingCoEquipCount) pending requests")
+                        .padding(.horizontal)
+                    }
+
                     // Quick Access Grid
                     VStack(alignment: .leading, spacing: 16) {
                         Text("Quick Access")
@@ -433,6 +487,9 @@ struct HomeView: View {
             .navigationDestination(isPresented: $isIncomeAnalysisActive) {
                 MonthlyIncomeView()
             }
+            .navigationDestination(isPresented: $isCoEquipRequestsActive) {
+                CoEquipRequestsView()
+            }
             .onAppear {
                 // Load data when HomeView appears if not already loaded
                 if !isInitialLoadComplete {
@@ -463,7 +520,8 @@ struct HomeView: View {
             // Small delay to ensure equipment data is set before fetching service requests
             try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
             try await dataController.fetchServiceRequests()
-            
+            try await dataController.fetchCoEquipRequests()
+
             await MainActor.run {
                 isInitialLoadComplete = true
                 isRefreshing = false
@@ -498,7 +556,8 @@ struct HomeView: View {
             try await dataController.fetchProducerEquipmentAndRequests()
             try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
             try await dataController.fetchServiceRequests()
-            
+            try await dataController.fetchCoEquipRequests()
+
             await MainActor.run {
                 isRefreshing = false
             }
