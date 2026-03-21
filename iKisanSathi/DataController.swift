@@ -1323,7 +1323,7 @@ class DataController: ObservableObject {
         let response = try await supabase.database
             .from("users")
             .select("name")
-            .eq("id", value: userId.uuidString)
+            .eq("userID", value: userId.uuidString)
             .single()
             .execute()
 
@@ -1339,10 +1339,163 @@ class DataController: ObservableObject {
         let response = try await supabase.database
             .from("request_participants")
             .select("*", head: false, count: .exact)
-            .eq("request_id", value: requestId.uuidString)
+            .eq("requestId", value: requestId.uuidString)
             .execute()
 
         return (response.count ?? 0) + 1 // +1 for the request creator
+    }
+
+    // MARK: - Co-Equip Participant Model
+    struct CoEquipParticipant: Codable, Identifiable {
+        let id: UUID
+        let requestId: UUID
+        let userId: UUID
+        let area: Double
+        let timeSlot: String?
+        var userName: String?
+
+        enum CodingKeys: String, CodingKey {
+            case id
+            case requestId
+            case userId
+            case area
+            case timeSlot = "timeSlotId"
+        }
+    }
+
+    // Fetch participants for a Co-Equip request with their details
+    func fetchParticipants(requestId: UUID) async throws -> [CoEquipParticipant] {
+        let response = try await supabase.database
+            .from("request_participants")
+            .select("*")
+            .eq("requestId", value: requestId.uuidString)
+            .execute()
+
+        let decoder = JSONDecoder()
+        var participants = try decoder.decode([CoEquipParticipant].self, from: response.data)
+
+        // Fetch user names for each participant
+        for i in participants.indices {
+            do {
+                let name = try await fetchUserName(userId: participants[i].userId)
+                participants[i].userName = name
+            } catch {
+                participants[i].userName = "Unknown"
+            }
+        }
+
+        return participants
+    }
+
+    // Accept a Co-Equip request
+    func acceptCoEquipRequest(_ request: CoEquipRequest) async throws {
+        // Prevent multiple taps by checking if already processing
+        guard !processingRequests.contains(request.id) else {
+            print("⚠️ Co-Equip Request \(request.id) is already being processed")
+            return
+        }
+
+        // Add to processing state immediately
+        await MainActor.run {
+            self.processingRequests.insert(request.id)
+        }
+
+        print("🔄 Accepting Co-Equip request with ID: \(request.id)")
+
+        do {
+            // Calculate amount based on area and equipment rates
+            let equipment = equipmentDetails[request.equipmentId ?? UUID()]
+            let amount = (equipment?.pricePerAcre ?? 0.0) * request.area
+            print("💰 Calculated amount: \(amount) based on area: \(request.area)")
+
+            // Create a new service request for the Co-Equip booking
+            let serviceRequest = ServiceRequest(
+                id: UUID(),
+                equipmentname: request.equipmentId ?? UUID(),
+                farmerid: request.userId ?? UUID(),
+                date: request.requestedDate,
+                status: .inProgress,
+                type: .coequip,
+                area: request.area,
+                timeslot: TimeSlot(rawValue: request.timeSlot.lowercased()) ?? .morning,
+                timeperiod: request.timePeriod ?? "",
+                location: request.location,
+                amount: amount
+            )
+
+            print("📝 Creating service request for Co-Equip with data: \(serviceRequest)")
+
+            // Insert into servicerequests table
+            try await supabase.database
+                .from("servicerequests")
+                .insert(serviceRequest)
+                .execute()
+
+            print("✅ Successfully inserted Co-Equip service request")
+
+            // Update the request status to "Confirmed"
+            print("🔄 Updating Co-Equip request status to Confirmed")
+            try await supabase.database
+                .from("requests")
+                .update(["status": "Confirmed"])
+                .eq("id", value: request.id)
+                .execute()
+
+            print("✅ Successfully updated Co-Equip request status to Confirmed")
+
+            // Remove from local state immediately
+            await MainActor.run {
+                self.coEquipRequests.removeAll { $0.id == request.id }
+                self.serviceRequests.append(serviceRequest)
+                self.processingRequests.remove(request.id)
+            }
+
+            print("🔄 Refreshing service requests list")
+            try await fetchServiceRequests()
+        } catch {
+            // Remove from processing state on error
+            await MainActor.run {
+                self.processingRequests.remove(request.id)
+            }
+            throw error
+        }
+    }
+
+    // Decline a Co-Equip request
+    func declineCoEquipRequest(_ request: CoEquipRequest) async throws {
+        // Prevent multiple taps
+        guard !processingRequests.contains(request.id) else {
+            print("⚠️ Co-Equip Request \(request.id) is already being processed")
+            return
+        }
+
+        await MainActor.run {
+            self.processingRequests.insert(request.id)
+        }
+
+        print("🔄 Declining Co-Equip request with ID: \(request.id)")
+
+        do {
+            // Update the request status to "cancelled"
+            try await supabase.database
+                .from("requests")
+                .update(["status": "cancelled"])
+                .eq("id", value: request.id)
+                .execute()
+
+            print("✅ Successfully declined Co-Equip request")
+
+            // Remove from local state
+            await MainActor.run {
+                self.coEquipRequests.removeAll { $0.id == request.id }
+                self.processingRequests.remove(request.id)
+            }
+        } catch {
+            await MainActor.run {
+                self.processingRequests.remove(request.id)
+            }
+            throw error
+        }
     }
 
     func updateEquipment(

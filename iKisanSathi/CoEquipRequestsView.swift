@@ -98,6 +98,15 @@ struct CoEquipRequestRow: View {
     @State private var equipmentImage: String?
     @State private var customerName: String = "Loading..."
     @State private var participantCount: Int = 0
+    @State private var participants: [DataController.CoEquipParticipant] = []
+    @State private var showParticipants: Bool = false
+    @State private var showError = false
+    @State private var errorMessage = ""
+
+    // Check if this request is being processed
+    private var isProcessing: Bool {
+        dataController.processingRequests.contains(request.id)
+    }
 
     private var timeSlotText: String {
         request.timeSlot.capitalized
@@ -160,13 +169,27 @@ struct CoEquipRequestRow: View {
                         .foregroundColor(.secondary)
                         .lineLimit(1)
 
-                    HStack(spacing: 4) {
-                        Image(systemName: "person.2.fill")
-                            .font(.caption2)
-                        Text("\(participantCount) farmers")
-                            .font(.caption)
+                    // Tappable participant count to show details
+                    Button(action: {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showParticipants.toggle()
+                        }
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "person.2.fill")
+                                .font(.caption2)
+                            Text("\(participantCount) farmers")
+                                .font(.caption)
+                            Image(systemName: "chevron.right")
+                                .font(.caption2)
+                                .rotationEffect(.degrees(showParticipants ? 90 : 0))
+                                .animation(.easeInOut, value: showParticipants)
+                        }
+                        .foregroundColor(.purple)
                     }
-                    .foregroundColor(.purple)
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(participantCount) farmers")
+                    .accessibilityHint("Expands to show individual farmer details")
                 }
                 Spacer()
             }
@@ -214,17 +237,17 @@ struct CoEquipRequestRow: View {
 
                 // Area and Location Row
                 HStack(spacing: 12) {
-                    // Area
+                    // Total Area
                     HStack(spacing: 6) {
                         Image(systemName: "map")
                             .font(.subheadline)
                             .foregroundColor(.green)
                             .frame(width: 20)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Area")
+                            Text("Total Area")
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
-                            Text("\(String(format: "%.1f", request.area)) acres")
+                            Text("\(String(format: "%.1f", calculateTotalArea())) acres")
                                 .font(.subheadline.weight(.medium))
                                 .foregroundColor(.primary)
                         }
@@ -269,41 +292,117 @@ struct CoEquipRequestRow: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
+                // Expandable Participants Section
+                if showParticipants {
+                    VStack(alignment: .leading, spacing: 0) {
+                        // Request Creator
+                        FarmerRowView(
+                            name: customerName,
+                            area: request.area,
+                            timeSlot: timeSlotText,
+                            isCreator: true
+                        )
+
+                        // Participating Farmers
+                        if !participants.isEmpty {
+                            ForEach(Array(participants.enumerated()), id: \.element.id) { index, participant in
+                                Divider()
+                                    .padding(.horizontal, 12)
+
+                                FarmerRowView(
+                                    name: participant.userName ?? "Farmer",
+                                    area: participant.area,
+                                    timeSlot: participant.timeSlot?.capitalized ?? timeSlotText,
+                                    isCreator: false
+                                )
+                            }
+                        }
+                    }
+                    .background(Color(uiColor: .secondarySystemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+
                 Divider()
 
-                // Status Badge
-                HStack(spacing: 12) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "clock.badge.exclamationmark")
+                // Directions Button
+                Button(action: {
+                    openInMaps()
+                }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "map.fill")
                             .font(.caption)
-                        Text("Awaiting Your Response")
-                            .font(.footnote.weight(.semibold))
+                        Text("Get Directions")
+                            .font(.subheadline.weight(.medium))
                     }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
                     .foregroundColor(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color.orange)
-                    .clipShape(Capsule())
-                    .shadow(color: Color.orange.opacity(0.3), radius: 4, x: 0, y: 2)
+                    .background(Color.blue)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
 
-                    Spacer()
+                Divider()
 
-                    // View on Map Button
+                // Action Buttons
+                HStack(spacing: 12) {
+                    // Accept Button
                     Button(action: {
-                        openInMaps()
-                    }) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "map.fill")
-                                .font(.caption)
-                            Text("Directions")
-                                .font(.footnote.weight(.semibold))
+                        Task {
+                            await handleAcceptRequest()
                         }
+                    }) {
+                        HStack(spacing: 8) {
+                            if isProcessing {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    .scaleEffect(0.8)
+                            } else {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.subheadline)
+                            }
+                            Text(isProcessing ? "Processing..." : "Accept")
+                                .font(.subheadline.weight(.semibold))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(isProcessing ? Color.gray : Color.green)
                         .foregroundColor(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(Color.blue)
-                        .clipShape(Capsule())
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .shadow(color: (isProcessing ? Color.gray : Color.green).opacity(0.3), radius: 4, x: 0, y: 2)
                     }
+                    .disabled(isProcessing)
+                    .accessibilityLabel(isProcessing ? "Processing request" : "Accept Co-Equip request")
+                    .accessibilityHint(isProcessing ? "" : "Accept this Co-Equip service request")
+
+                    // Decline Button
+                    Button(action: {
+                        Task {
+                            await handleDeclineRequest()
+                        }
+                    }) {
+                        HStack(spacing: 8) {
+                            if isProcessing {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    .scaleEffect(0.8)
+                            } else {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.subheadline)
+                            }
+                            Text(isProcessing ? "Processing..." : "Decline")
+                                .font(.subheadline.weight(.semibold))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(isProcessing ? Color.gray : Color.red)
+                        .foregroundColor(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .shadow(color: (isProcessing ? Color.gray : Color.red).opacity(0.3), radius: 4, x: 0, y: 2)
+                    }
+                    .disabled(isProcessing)
+                    .accessibilityLabel(isProcessing ? "Processing request" : "Decline Co-Equip request")
+                    .accessibilityHint(isProcessing ? "" : "Decline this Co-Equip service request")
                 }
             }
         }
@@ -312,6 +411,17 @@ struct CoEquipRequestRow: View {
         .background(Color(.systemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 2)
+        .overlay(Group {
+            if isProcessing {
+                Color.black.opacity(0.1)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+            }
+        })
+        .alert("Error", isPresented: $showError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(errorMessage)
+        }
         .task {
             await loadRequestDetails()
         }
@@ -358,6 +468,44 @@ struct CoEquipRequestRow: View {
                 participantCount = 1
             }
         }
+
+        // Fetch participants details
+        do {
+            let fetchedParticipants = try await dataController.fetchParticipants(requestId: request.id)
+            await MainActor.run {
+                participants = fetchedParticipants
+            }
+        } catch {
+            print("Error fetching participants: \(error)")
+        }
+    }
+
+    private func handleAcceptRequest() async {
+        do {
+            try await dataController.acceptCoEquipRequest(request)
+        } catch {
+            await MainActor.run {
+                errorMessage = error.localizedDescription
+                showError = true
+            }
+        }
+    }
+
+    private func handleDeclineRequest() async {
+        do {
+            try await dataController.declineCoEquipRequest(request)
+        } catch {
+            await MainActor.run {
+                errorMessage = error.localizedDescription
+                showError = true
+            }
+        }
+    }
+
+    private func calculateTotalArea() -> Double {
+        // Sum of request creator's area and all participants' areas
+        let participantAreas = participants.reduce(0.0) { $0 + $1.area }
+        return request.area + participantAreas
     }
 
     private func openInMaps() {
@@ -373,5 +521,46 @@ struct CoEquipRequestRow: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Farmer Row View
+struct FarmerRowView: View {
+    let name: String
+    let area: Double
+    let timeSlot: String
+    let isCreator: Bool
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 8) {
+            // Leading: Name and Area
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 4) {
+                    Text(name)
+                        .font(.subheadline)
+                        .bold()
+                        .foregroundColor(.primary)
+                    if isCreator {
+                        Text("(Creator)")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                Text("\(String(format: "%.1f", area)) acres")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer()
+
+            // Trailing: Time Slot
+            Text(timeSlot)
+                .font(.caption2)
+                .foregroundColor(Color(uiColor: .tertiaryLabel))
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(name), \(String(format: "%.1f", area)) acres, \(timeSlot)")
     }
 }

@@ -245,12 +245,16 @@ struct RequestRow: View {
     @State private var showError = false
     @State private var errorMessage = ""
     @State private var showingEditSheet = false
-    
+    @State private var participantCount: Int = 0
+    @State private var participants: [DataController.CoEquipParticipant] = []
+    @State private var showParticipants: Bool = false
+    @State private var customerName: String = "Loading..."
+
     // Check if this request is being processed
     private var isProcessing: Bool {
         dataController.processingRequests.contains(request.id)
     }
-    
+
     // Helper to get time slot display name
     private var timeSlotText: String {
         switch request.timeSlot {
@@ -262,7 +266,7 @@ struct RequestRow: View {
             return "Evening"
         }
     }
-    
+
     // Helper to get time slot color
     private var timeSlotColor: Color {
         switch request.timeSlot {
@@ -273,6 +277,11 @@ struct RequestRow: View {
         case .evening:
             return .indigo
         }
+    }
+
+    private func calculateTotalArea() -> Double {
+        let participantAreas = participants.reduce(0.0) { $0 + $1.area }
+        return request.area + participantAreas
     }
     
     var body: some View {
@@ -289,32 +298,57 @@ struct RequestRow: View {
                             RoundedRectangle(cornerRadius: 12)
                                 .stroke(Color(.systemGray5), lineWidth: 1)
                         )
-                    
+
                     VStack(alignment: .leading, spacing: 6) {
                         Text(equipment.name)
                             .font(.headline)
                             .foregroundColor(.primary)
                             .lineLimit(1)
-                        
+
                         Text(equipment.type)
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                             .lineLimit(1)
-                        
-                        HStack(spacing: 4) {
-                            Image(systemName: "scalemass")
-                                .font(.caption2)
-                            Text(equipment.capacity)
-                                .font(.caption)
+
+                        if request.type == .coEquip {
+                            // For Co-Equip: Show tappable participant count
+                            Button(action: {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    showParticipants.toggle()
+                                }
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "person.2.fill")
+                                        .font(.caption2)
+                                    Text("\(participantCount) farmers")
+                                        .font(.caption)
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption2)
+                                        .rotationEffect(.degrees(showParticipants ? 90 : 0))
+                                        .animation(.easeInOut, value: showParticipants)
+                                }
+                                .foregroundColor(.purple)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("\(participantCount) farmers")
+                            .accessibilityHint("Expands to show individual farmer details")
+                        } else {
+                            // For Individual: Show capacity
+                            HStack(spacing: 4) {
+                                Image(systemName: "scalemass")
+                                    .font(.caption2)
+                                Text(equipment.capacity)
+                                    .font(.caption)
+                            }
+                            .foregroundColor(.secondary)
                         }
-                        .foregroundColor(.secondary)
                     }
                     Spacer()
                 }
             }
-            
+
             Divider()
-            
+
             // Request Details Grid
             VStack(spacing: 12) {
                 // Date and Time Slot Row
@@ -337,7 +371,7 @@ struct RequestRow: View {
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    
+
                     // Time Slot
                     HStack(spacing: 6) {
                         Image(systemName: "clock.fill")
@@ -355,26 +389,26 @@ struct RequestRow: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                
+
                 // Area and Type Row
                 HStack(spacing: 12) {
-                    // Area
+                    // Area (show total for Co-Equip)
                     HStack(spacing: 6) {
                         Image(systemName: "map")
                             .font(.subheadline)
                             .foregroundColor(.green)
                             .frame(width: 20)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Area")
+                            Text(request.type == .coEquip ? "Total Area" : "Area")
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
-                            Text("\(String(format: "%.1f", request.area)) acres")
+                            Text("\(String(format: "%.1f", request.type == .coEquip ? calculateTotalArea() : request.area)) acres")
                                 .font(.subheadline.weight(.medium))
                                 .foregroundColor(.primary)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    
+
                     // Request Type Badge - aligned to match Time Slot position
                     HStack(spacing: 6) {
                         Spacer()
@@ -392,9 +426,40 @@ struct RequestRow: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .trailing)
                 }
-                
+
+                // Expandable Participants Section (for Co-Equip only)
+                if request.type == .coEquip && showParticipants {
+                    VStack(alignment: .leading, spacing: 0) {
+                        // Request Creator
+                        FarmerRowView(
+                            name: customerName,
+                            area: request.area,
+                            timeSlot: timeSlotText,
+                            isCreator: true
+                        )
+
+                        // Participating Farmers
+                        if !participants.isEmpty {
+                            ForEach(Array(participants.enumerated()), id: \.element.id) { index, participant in
+                                Divider()
+                                    .padding(.horizontal, 12)
+
+                                FarmerRowView(
+                                    name: participant.userName ?? "Farmer",
+                                    area: participant.area,
+                                    timeSlot: participant.timeSlot?.capitalized ?? timeSlotText,
+                                    isCreator: false
+                                )
+                            }
+                        }
+                    }
+                    .background(Color(uiColor: .secondarySystemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+
                 Divider()
-                
+
                 // Location Button
                 Button(action: {
                     openInMaps()
@@ -413,7 +478,7 @@ struct RequestRow: View {
                 }
                 .accessibilityLabel("View location in Maps")
                 .accessibilityHint("Opens Apple Maps with directions to the request location")
-                
+
                 Divider()
                 
                 // Action Buttons
@@ -500,8 +565,54 @@ struct RequestRow: View {
                 EditEquipmentView(equipment: equipment)
             }
         }
+        .task {
+            // Load participant data for Co-Equip requests
+            if request.type == .coEquip {
+                await loadCoEquipDetails()
+            }
+        }
     }
-    
+
+    private func loadCoEquipDetails() async {
+        // Fetch customer name
+        if let userId = request.userId {
+            do {
+                let name = try await dataController.fetchUserName(userId: userId)
+                await MainActor.run {
+                    customerName = name
+                }
+            } catch {
+                print("Error fetching customer name: \(error)")
+                await MainActor.run {
+                    customerName = "Unknown"
+                }
+            }
+        }
+
+        // Fetch participant count
+        do {
+            let count = try await dataController.fetchParticipantCount(requestId: request.id)
+            await MainActor.run {
+                participantCount = count
+            }
+        } catch {
+            print("Error fetching participant count: \(error)")
+            await MainActor.run {
+                participantCount = 1
+            }
+        }
+
+        // Fetch participants details
+        do {
+            let fetchedParticipants = try await dataController.fetchParticipants(requestId: request.id)
+            await MainActor.run {
+                participants = fetchedParticipants
+            }
+        } catch {
+            print("Error fetching participants: \(error)")
+        }
+    }
+
     private func handleAcceptRequest() async {
         do {
             try await dataController.acceptRequest(request)
