@@ -472,11 +472,30 @@ struct CoEquipRequestRow: View {
         // Fetch participants details
         do {
             let fetchedParticipants = try await dataController.fetchParticipants(requestId: request.id)
+            #if DEBUG
+            print("📋 Fetched \(fetchedParticipants.count) joined participants for request \(request.id)")
+            #endif
             await MainActor.run {
                 participants = fetchedParticipants
             }
         } catch {
-            print("Error fetching participants: \(error)")
+            print("❌ Error fetching participants: \(error)")
+            #if DEBUG
+            if let decodingError = error as? DecodingError {
+                switch decodingError {
+                case .keyNotFound(let key, let context):
+                    print("   Key '\(key.stringValue)' not found: \(context.debugDescription)")
+                case .typeMismatch(let type, let context):
+                    print("   Type mismatch for type \(type): \(context.debugDescription)")
+                case .valueNotFound(let type, let context):
+                    print("   Value not found for type \(type): \(context.debugDescription)")
+                case .dataCorrupted(let context):
+                    print("   Data corrupted: \(context.debugDescription)")
+                @unknown default:
+                    print("   Unknown decoding error")
+                }
+            }
+            #endif
         }
     }
 

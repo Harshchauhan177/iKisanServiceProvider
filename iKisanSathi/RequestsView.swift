@@ -71,8 +71,16 @@ struct RequestsView: View {
     }
     
     var filteredBookings: [Booking] {
-        // Include bookings in both Individual and Co-Equip segments
-        return dataController.producerBookings
+        switch selectedRequestType {
+        case 0:
+            // Individual bookings - exclude Co-Equip
+            return dataController.producerBookings.filter { $0.bookingType != .coEquip }
+        case 1:
+            // Co-Equip bookings only
+            return dataController.producerBookings.filter { $0.bookingType == .coEquip }
+        default:
+            return []
+        }
     }
     
     var body: some View {

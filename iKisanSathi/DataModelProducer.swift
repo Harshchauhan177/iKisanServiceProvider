@@ -67,19 +67,50 @@ struct Booking: Codable, Identifiable {
         userId = try container.decodeIfPresent(UUID.self, forKey: .userId)
         equipmentId = try container.decodeIfPresent(UUID.self, forKey: .equipmentId)
         bookingType = try container.decode(BookingType.self, forKey: .bookingType)
-        
-        // Decode the timestamp string to Date
+
+        // Decode the timestamp string to Date with multiple format support
         let dateString = try container.decode(String.self, forKey: .bookingDate)
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
-        if let date = formatter.date(from: dateString) {
+
+        // Try multiple date formats for resilient parsing
+        let formatters: [DateFormatter] = {
+            let formats = [
+                "yyyy-MM-dd'T'HH:mm:ssZ",
+                "yyyy-MM-dd'T'HH:mm:ss.SSSZ",
+                "yyyy-MM-dd'T'HH:mm:ss",
+                "yyyy-MM-dd'T'HH:mm:ssXXXXX",
+                "yyyy-MM-dd"
+            ]
+            return formats.map { format in
+                let formatter = DateFormatter()
+                formatter.dateFormat = format
+                formatter.locale = Locale(identifier: "en_US_POSIX")
+                return formatter
+            }
+        }()
+
+        var parsedDate: Date?
+        for formatter in formatters {
+            if let date = formatter.date(from: dateString) {
+                parsedDate = date
+                break
+            }
+        }
+
+        // Also try ISO8601DateFormatter as fallback
+        if parsedDate == nil {
+            let iso8601 = ISO8601DateFormatter()
+            iso8601.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            parsedDate = iso8601.date(from: dateString)
+        }
+
+        if let date = parsedDate {
             bookingDate = date
         } else {
             throw DecodingError.dataCorruptedError(forKey: .bookingDate,
                                                   in: container,
-                                                  debugDescription: "Date string does not match expected format")
+                                                  debugDescription: "Date string '\(dateString)' does not match any expected format")
         }
-        
+
         fieldArea = try container.decode(Double.self, forKey: .fieldArea)
         status = try container.decode(BookingStatus.self, forKey: .status)
         timeSlot = try container.decode(TimeSlot.self, forKey: .timeSlot)

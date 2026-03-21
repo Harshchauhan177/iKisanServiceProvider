@@ -1016,6 +1016,28 @@ class DataController: ObservableObject {
 
     @Published var coEquipRequests: [CoEquipRequest] = []
     @Published var serviceRequests: [ServiceRequest] = []
+
+    // MARK: - Computed Properties for Filtered Data
+
+    /// Individual requests (non-CoEquip) from producerRequests
+    var individualRequests: [Request] {
+        producerRequests.filter { $0.type != .coEquip }
+    }
+
+    /// Co-Equip requests from producerRequests
+    var coEquipRequestsFromProducer: [Request] {
+        producerRequests.filter { $0.type == .coEquip }
+    }
+
+    /// Individual bookings (non-CoEquip)
+    var individualBookings: [Booking] {
+        producerBookings.filter { $0.bookingType != .coEquip }
+    }
+
+    /// Co-Equip bookings only
+    var coEquipBookings: [Booking] {
+        producerBookings.filter { $0.bookingType == .coEquip }
+    }
     
     func fetchServiceRequests() async throws {
         // Check cache - skip if recently fetched (within last 5 seconds)
@@ -1350,7 +1372,7 @@ class DataController: ObservableObject {
         let id: UUID
         let requestId: UUID
         let userId: UUID
-        let area: Double
+        var area: Double
         let timeSlot: String?
         var userName: String?
 
@@ -1360,6 +1382,17 @@ class DataController: ObservableObject {
             case userId
             case area
             case timeSlot = "timeSlotId"
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self.id = try container.decode(UUID.self, forKey: .id)
+            self.requestId = try container.decode(UUID.self, forKey: .requestId)
+            self.userId = try container.decode(UUID.self, forKey: .userId)
+            // Handle NULL area gracefully - default to 0
+            self.area = try container.decodeIfPresent(Double.self, forKey: .area) ?? 0.0
+            self.timeSlot = try container.decodeIfPresent(String.self, forKey: .timeSlot)
+            self.userName = nil
         }
     }
 
@@ -1371,8 +1404,22 @@ class DataController: ObservableObject {
             .eq("requestId", value: requestId.uuidString)
             .execute()
 
+        #if DEBUG
+        print("📥 Raw participants data: \(String(data: response.data, encoding: .utf8) ?? "nil")")
+        #endif
+
         let decoder = JSONDecoder()
-        var participants = try decoder.decode([CoEquipParticipant].self, from: response.data)
+        var participants: [CoEquipParticipant] = []
+
+        do {
+            participants = try decoder.decode([CoEquipParticipant].self, from: response.data)
+            #if DEBUG
+            print("✅ Successfully decoded \(participants.count) participants")
+            #endif
+        } catch {
+            print("❌ Failed to decode participants: \(error)")
+            throw error
+        }
 
         // Fetch user names for each participant
         for i in participants.indices {
