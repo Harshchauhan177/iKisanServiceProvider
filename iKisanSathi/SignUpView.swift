@@ -126,11 +126,19 @@ struct SignUpView: View {
             do {
                 try await dataController.verifyOTP(otp: otp)
                 try await dataController.completeSignUp()
+                
+                // Auto login after successful signup
+                guard !email.isEmpty else {
+                    throw NSError(domain: "SignUp", code: 1, userInfo: [NSLocalizedDescriptionKey: "Email is missing"])
+                }
+                
+                try await dataController.signIn(email: email, password: password)
+                
                 DispatchQueue.main.async {
-                    alertMessage = "Account created successfully!"
+                    alertMessage = "Account created and logged in successfully!"
                     showingAlert = true
                     isLoading = false
-                    dismiss() // go back to login
+                    dismiss() // go back to previous screen (login/home)
                 }
             } catch {
                 DispatchQueue.main.async {

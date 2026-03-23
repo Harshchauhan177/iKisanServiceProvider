@@ -1,5 +1,5 @@
 //
-//  SignInWithAppleViewModel.swift
+//  ProfileView.swift
 //  iKisanSathi
 //
 //  Created by harsh chauhan on 03/06/25.
@@ -143,21 +143,6 @@ struct ProfileView: View {
                             .padding(.bottom, 8)
                     VStack(alignment: .leading, spacing: 16) {
                         
-                        // Rating
-//                        HStack {
-//                            HStack(spacing: 2) {
-//                                ForEach(0..<4, id: \.self) { _ in
-//                                    Image(systemName: "star.fill")
-//                                        .foregroundColor(.green)
-//                                }
-//                                Image(systemName: "star.leadinghalf.filled")
-//                                    .foregroundColor(.green)
-//                            }
-//                            Text("4.8/5.0")
-//                                .foregroundColor(.secondary)
-//                                .padding(.leading, 4)
-//                        }
-                        
                         // Account Number
                         HStack {
                             Text("Account Number:")
@@ -185,30 +170,6 @@ struct ProfileView: View {
                                 Text(userProfile?.ifcsCode ?? dataController.currentProducer?.ifcsCode ?? "Not provided")
                             }
                         }
-                        
-                        // Rating
-//                        HStack {
-//                            Text("Rating:")
-//                                .foregroundColor(.secondary)
-//                            Spacer()
-//                            if let rating = userProfile?.rating ?? dataController.currentProducer?.rating {
-//                                HStack(spacing: 2) {
-//                                    ForEach(0..<Int(rating), id: \.self) { _ in
-//                                        Image(systemName: "star.fill")
-//                                            .foregroundColor(.green)
-//                                    }
-//                                    if rating - Double(Int(rating)) >= 0.5 {
-//                                        Image(systemName: "star.leadinghalf.filled")
-//                                            .foregroundColor(.green)
-//                                    }
-//                                }
-//                                Text("\(String(format: "%.1f", rating))/5.0")
-//                                    .foregroundColor(.secondary)
-//                                    .padding(.leading, 4)
-//                            } else {
-//                                Text("Not rated yet")
-//                            }
-//                        }
                     }
                     .padding()
                     .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemBackground)))
@@ -494,6 +455,4 @@ struct ProfileView: View {
             }
         }
     }
-    
-
 }

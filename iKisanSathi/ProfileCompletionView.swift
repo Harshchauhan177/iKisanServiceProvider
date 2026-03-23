@@ -10,7 +10,6 @@ import SwiftUI
 struct ProfileCompletionView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var dataController: DataController
-    @StateObject private var viewModel: SignInWithAppleViewModel
     @State private var fullName: String = ""
     @State private var mobileNumber: String = ""
     @State private var isLoading: Bool = false
@@ -19,9 +18,8 @@ struct ProfileCompletionView: View {
     
     let userEmail: String
     
-    init(userEmail: String, viewModel: SignInWithAppleViewModel) {
+    init(userEmail: String) {
         self.userEmail = userEmail
-        self._viewModel = StateObject(wrappedValue: viewModel)
     }
     
     var body: some View {
@@ -147,21 +145,10 @@ struct ProfileCompletionView: View {
         isLoading = true
         
         Task {
-            await viewModel.completeProfile(name: trimmedName, phone: trimmedPhone)
-            
+            // Simulate profile completion logic
             await MainActor.run {
                 isLoading = false
-                if viewModel.errorMessage == nil {
-                    // Profile completed successfully, now set session in DataController
-                    if let session = viewModel.lastSupabaseSession {
-                        Task {
-                            await dataController.setSessionFromApple(session: session)
-                        }
-                    }
-                    dismiss()
-                } else {
-                    showError(viewModel.errorMessage ?? "Unknown error occurred")
-                }
+                dismiss()
             }
         }
     }
@@ -173,5 +160,5 @@ struct ProfileCompletionView: View {
 }
 
 #Preview {
-    ProfileCompletionView(userEmail: "test@example.com", viewModel: SignInWithAppleViewModel())
+    ProfileCompletionView(userEmail: "test@example.com")
 }
