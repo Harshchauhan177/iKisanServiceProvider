@@ -33,6 +33,7 @@ class DataController: ObservableObject {
     // Add processing state tracking to prevent multiple taps
     @Published var processingRequests: Set<UUID> = []
     @Published var processingBookings: Set<UUID> = []
+    @Published var isDeletingAccount = false
     
     // Track ongoing fetch tasks to prevent redundant calls
     private var equipmentFetchTask: Task<Void, Error>?
@@ -2078,5 +2079,158 @@ class DataController: ObservableObject {
                 try await self.fetchCoEquipRequests()
             }
         }
+    }
+    
+    // MARK: - Account Deletion
+    
+    // Delete account database records and trigger auth deletion on Edge Function.
+    // Does NOT clear the local session yet, so that the success alert can be presented in the view before it is destroyed.
+    func deleteAccount() async throws {
+        guard let currentUser = currentUser else {
+            throw NSError(domain: "DataController", code: 401, userInfo: [NSLocalizedDescriptionKey: "User not authenticated."])
+        }
+        
+        await MainActor.run {
+            self.isDeletingAccount = true
+        }
+        
+        do {
+            print("🚀 Starting account deletion for user \(currentUser.id)...")
+            
+            // 1. Fetch equipment IDs for the producer
+            let equipmentResponse = try await supabase.from("equipment")
+                .select("equipmentID")
+                .eq("providerID", value: currentUser.id.uuidString)
+                .execute()
+            
+            struct EquipmentIDOnly: Decodable {
+                let equipmentID: UUID
+            }
+            
+            let decoder = JSONDecoder()
+            let equipmentItems = try? decoder.decode([EquipmentIDOnly].self, from: equipmentResponse.data)
+            let equipmentIds = equipmentItems?.map { $0.equipmentID.uuidString } ?? []
+            
+            print("🚜 Found equipment IDs for deletion: \(equipmentIds)")
+            
+            // 2. Delete equipment dependents (if any equipment exist)
+            if !equipmentIds.isEmpty {
+                // Delete from equipmentMoreImages
+                print("🧹 Deleting from equipmentMoreImages...")
+                _ = try? await supabase.from("equipmentMoreImages")
+                    .delete()
+                    .in("equipmentID", values: equipmentIds)
+                    .execute()
+                
+                // Delete from bookings
+                print("🧹 Deleting from bookings...")
+                _ = try? await supabase.from("bookings")
+                    .delete()
+                    .in("equipmentID", values: equipmentIds)
+                    .execute()
+                
+                // Delete from requests
+                print("🧹 Deleting from requests...")
+                _ = try? await supabase.from("requests")
+                    .delete()
+                    .in("equipmentId", values: equipmentIds)
+                    .execute()
+                
+                // Delete from servicerequests
+                print("🧹 Deleting from servicerequests...")
+                _ = try? await supabase.from("servicerequests")
+                    .delete()
+                    .in("equipmentname", values: equipmentIds)
+                    .execute()
+            }
+            
+            // 3. Delete other producer dependents
+            // Delete from monthly_income
+            print("🧹 Deleting from monthly_income...")
+            _ = try? await supabase.from("monthly_income")
+                .delete()
+                .eq("producer_id", value: currentUser.id.uuidString)
+                .execute()
+            
+            // Try to delete from notifications if table exists
+            print("🧹 Deleting from notifications (if exists)...")
+            _ = try? await supabase.from("notifications")
+                .delete()
+                .eq("user_id", value: currentUser.id.uuidString)
+                .execute()
+            
+            _ = try? await supabase.from("notifications")
+                .delete()
+                .eq("producer_id", value: currentUser.id.uuidString)
+                .execute()
+                
+            // Try to delete from ratings/reviews if tables exist
+            print("🧹 Deleting from ratings (if exists)...")
+            _ = try? await supabase.from("ratings")
+                .delete()
+                .eq("producer_id", value: currentUser.id.uuidString)
+                .execute()
+                
+            _ = try? await supabase.from("reviews")
+                .delete()
+                .eq("producer_id", value: currentUser.id.uuidString)
+                .execute()
+            
+            // 4. Delete equipment owned by the producer
+            if !equipmentIds.isEmpty {
+                print("🧹 Deleting equipment records...")
+                _ = try await supabase.from("equipment")
+                    .delete()
+                    .eq("providerID", value: currentUser.id.uuidString)
+                    .execute()
+            }
+            
+            // 5. Delete producer profile
+            print("🧹 Deleting producer profile...")
+            _ = try await supabase.from("producer")
+                .delete()
+                .eq("id", value: currentUser.id.uuidString)
+                .execute()
+            
+            // 6. Delete authenticated user using Supabase Edge Function
+            // Note: The Supabase Edge Function endpoint 'delete-user' must be deployed on your Supabase project.
+            print("🔒 Invoking delete-user Edge Function...")
+            try await supabase.functions.invoke(
+                "delete-user",
+                options: FunctionInvokeOptions(),
+                decode: { _, _ in () }
+            )
+            print("✅ Edge Function invocation completed successfully")
+            
+            await MainActor.run {
+                self.isDeletingAccount = false
+            }
+        } catch {
+            await MainActor.run {
+                self.isDeletingAccount = false
+            }
+            print("❌ Failed to delete account: \(error)")
+            throw error
+        }
+    }
+    
+    // Clear local session/cached data and navigate back to login screen.
+    func completeAccountDeletionCleanup() {
+        print("🧹 Performing post-account-deletion client cleanup...")
+        // Reset all auth/data states on main thread
+        DispatchQueue.main.async {
+            self.isAuthenticated = false
+            self.currentUser = nil
+            self.currentProducer = nil
+            self.isOTPSent = false
+            self.isOTPVerified = false
+            self.tempEmail = nil
+            self.equipmentDetails = [:]
+            self.producerEquipment = []
+            self.producerRequests = []
+        }
+        
+        // Clear stored session in UserDefaults
+        clearStoredSession()
     }
 }

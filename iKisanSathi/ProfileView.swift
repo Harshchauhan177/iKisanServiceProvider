@@ -15,6 +15,8 @@ struct ProfileView: View {
     @State private var errorMessage: String?
     @State private var showingError = false
     @State private var isEditMode = false
+    @State private var showingDeleteConfirmation = false
+    @State private var showingDeleteSuccess = false
     
     // Editable fields
     @State private var name = ""
@@ -27,7 +29,7 @@ struct ProfileView: View {
         ZStack {
             Color(.systemGray6).edgesIgnoringSafeArea(.all)
             
-            if isLoading {
+            if isLoading || dataController.isDeletingAccount {
                 LoadingView()
             }
             
@@ -319,9 +321,33 @@ struct ProfileView: View {
                         .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemBackground)))
                         .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 2)
                     }
+                    
+                    // Delete Account Button
+                    VStack(alignment: .leading, spacing: 0) {
+                        Button {
+                            showingDeleteConfirmation = true
+                        } label: {
+                            HStack {
+                                Image(systemName: "trash.fill")
+                                    .foregroundColor(.red)
+                                    .frame(width: 30, height: 30)
+                                    .background(Color(.systemGray6))
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                
+                                Text("Delete Account")
+                                    .foregroundColor(.red)
+                                    .fontWeight(.semibold)
+                                Spacer()
+                            }
+                            .padding()
+                        }
+                        .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemBackground)))
+                        .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 2)
+                    }
                 }
                 .padding()
             }
+            .disabled(isLoading || dataController.isDeletingAccount)
         }
         .navigationTitle("Profile")
         .navigationBarTitleDisplayMode(.inline)
@@ -347,6 +373,23 @@ struct ProfileView: View {
             Button("OK", role: .cancel) {}
         }, message: {
             Text(errorMessage ?? "An error occurred")
+        })
+        .confirmationDialog(
+            "Are you sure you want to permanently delete your account? This action cannot be undone and will permanently remove your profile and all associated data.",
+            isPresented: $showingDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete Account", role: .destructive) {
+                deleteAccount()
+            }
+            Button("Cancel", role: .cancel) {}
+        }
+        .alert("Success", isPresented: $showingDeleteSuccess, actions: {
+            Button("OK") {
+                dataController.completeAccountDeletionCleanup()
+            }
+        }, message: {
+            Text("Your account has been permanently deleted.")
         })
     }
     
@@ -452,6 +495,24 @@ struct ProfileView: View {
                 updatedProducer.ifcsCode = ifcsCode
                 
                 dataController.currentProducer = updatedProducer
+            }
+        }
+    }
+    
+    private func deleteAccount() {
+        guard !dataController.isDeletingAccount else { return }
+        
+        Task {
+            do {
+                try await dataController.deleteAccount()
+                await MainActor.run {
+                    showingDeleteSuccess = true
+                }
+            } catch {
+                await MainActor.run {
+                    errorMessage = "Failed to delete account: \(error.localizedDescription)\n\nPlease verify your internet connection and try again."
+                    showingError = true
+                }
             }
         }
     }
